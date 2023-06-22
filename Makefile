@@ -2,8 +2,13 @@ WORK_DIR=${PWD}
 PROJECT=pf_track
 DOCKER_IMAGE=${PROJECT}:latest
 DOCKER_FILE=docker/Dockerfile-pftrack
-DATA_ROOT=/media/brian/Data1
-CKPTS_ROOT=./ckpts
+# apollo params
+NUSCENES_ROOT_APOLLO=/scratch/hpc_nas/datasets/nuscenes/v1.0-mini
+CKPTS_ROOT_APOLLO=/scratch/hpc_nas/input/bcheong/Projects/PF-Track/ckpts
+
+# local params
+NUSCENES_ROOT_LOCAL=/media/brian/Data1
+CKPTS_ROOT_LOCAL=./ckpts
 
 DOCKER_OPTS = \
 	-it \
@@ -15,8 +20,6 @@ DOCKER_OPTS = \
 	-v ~/.ssh:/root/.ssh \
 	-v ~/.aws:/root/.aws \
 	-v ${WORK_DIR}:/workspace/${PROJECT} \
-	-v ${DATA_ROOT}/nuscenes/v1.0-mini:/workspace/${PROJECT}/data/nuscenes \
-	-v ${CKPTS_ROOT}:/workspace/${PROJECT}/ckpts \
 	--shm-size=1G \
 	--ipc=host \
 	--network=host \
@@ -34,9 +37,19 @@ docker-build:
 	nvidia-docker image build -f $(DOCKER_FILE) -t $(DOCKER_IMAGE) \
 	$(DOCKER_BUILD_ARGS) .
 
-docker-dev:
+docker-dev-apollo:
 	nvidia-docker run --name $(PROJECT) \
 	$(DOCKER_OPTS) \
+	-v ${WORK_DIR}:/workspace/${PROJECT} \
+	-v ${NUSCENES_ROOT_APOLLO}:/workspace/${PROJECT}/data/nuscenes \
+	-v ${CKPTS_ROOT_APOLLO}:/workspace/${PROJECT}/ckpts \
+	$(DOCKER_IMAGE) bash
+
+docker-dev-local:
+	nvidia-docker run --name $(PROJECT) \
+	$(DOCKER_OPTS) \
+	-v ${NUSCENES_ROOT_LOCAL}:/workspace/${PROJECT}/data/nuscenes \
+	-v ${CKPTS_ROOT_LOCAL}:/workspace/${PROJECT}/ckpts \
 	$(DOCKER_IMAGE) bash
 
 clean:
