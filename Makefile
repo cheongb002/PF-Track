@@ -1,9 +1,9 @@
 WORK_DIR=${PWD}
-PROJECT=PF_Track
+PROJECT=pf_track
 DOCKER_IMAGE=${PROJECT}:latest
 DOCKER_FILE=docker/Dockerfile-pftrack
-DATA_ROOT=/mnt/fsx/datasets
-CKPTS_ROOT=/mnt/fsx/ckpts
+DATA_ROOT=/media/brian/Data1
+CKPTS_ROOT=./ckpts
 
 DOCKER_OPTS = \
 	-it \
@@ -15,7 +15,7 @@ DOCKER_OPTS = \
 	-v ~/.ssh:/root/.ssh \
 	-v ~/.aws:/root/.aws \
 	-v ${WORK_DIR}:/workspace/${PROJECT} \
-	-v ${DATA_ROOT}:/workspace/${PROJECT}/data \
+	-v ${DATA_ROOT}/nuscenes/v1.0-mini:/workspace/${PROJECT}/data/nuscenes \
 	-v ${CKPTS_ROOT}:/workspace/${PROJECT}/ckpts \
 	--shm-size=1G \
 	--ipc=host \
