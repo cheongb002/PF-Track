@@ -1,6 +1,6 @@
 # Base image
-ARG PYTORCH="1.9.0"
-ARG CUDA="11.1"
+ARG PYTORCH="1.10.0"
+ARG CUDA="11.3"
 ARG CUDNN="8"
 
 FROM pytorch/pytorch:${PYTORCH}-cuda${CUDA}-cudnn${CUDNN}-devel
@@ -8,6 +8,7 @@ FROM pytorch/pytorch:${PYTORCH}-cuda${CUDA}-cudnn${CUDNN}-devel
 ENV TORCH_CUDA_ARCH_LIST="6.0 6.1 7.0+PTX"
 ENV TORCH_NVCC_FLAGS="-Xfatbin -compress-all"
 ENV CMAKE_PREFIX_PATH="$(dirname $(which conda))/../"
+ENV DEBIAN_FRONTEND noninteractive
 
 # To fix GPG key error when running apt-get update
 RUN apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu1804/x86_64/3bf863cc.pub
@@ -69,7 +70,7 @@ ENV FORCE_CUDA="1"
 RUN git clone https://github.com/tusen-ai/SimpleTrack && cd SimpleTrack && \
     pip install -e .
 
-RUN pip install mmcv-full==${MMCV} -f https://download.openmmlab.com/mmcv/dist/cu111/torch1.9.0/index.html
+RUN pip install mmcv-full==${MMCV} -f https://download.openmmlab.com/mmcv/dist/cu113/torch${PYTORCH}/index.html
 
 WORKDIR /workspace/mmlab
 RUN git clone https://github.com/open-mmlab/mmdetection.git && cd mmdetection && \
