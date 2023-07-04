@@ -2,7 +2,7 @@ WORK_DIR=${PWD}
 PROJECT=pf_track
 DOCKER_IMAGE=${PROJECT}:latest
 DOCKER_FILE=docker/Dockerfile-pftrack
-DATA_ROOT=/media/brian/Data1
+DATA_ROOT=/media/brian/Data2
 CKPTS_ROOT=./ckpts
 
 DOCKER_OPTS = \
