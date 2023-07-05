@@ -366,5 +366,5 @@ evaluation = dict(interval=12, pipeline=test_pipeline)
 find_unused_parameters=False
 
 runner = dict(type='EpochBasedRunner', max_epochs=total_epochs)
-load_from='ckpts/f1_q5_e12.pth'
+load_from='ckpts/f1/f1_q5_e12.pth'
 resume_from=None
