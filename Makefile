@@ -1,9 +1,10 @@
 WORK_DIR=${PWD}
 PROJECT=pf_track
-DOCKER_IMAGE=${PROJECT}:latest
+DOCKER_IMAGE=bcheong/${PROJECT}:latest
 DOCKER_FILE=docker/Dockerfile-pftrack
-DATA_ROOT=/media/brian/Data2
-CKPTS_ROOT=./ckpts
+DATA_ROOT_LOCAL=/media/brian/Data2/nuscenes/v1.0-mini
+DATA_ROOT_APOLLO=/scratch/hpc_nas/datasets/nuscenes/v1.0-trainval
+CKPTS_ROOT=${PWD}/ckpts
 
 DOCKER_OPTS = \
 	-it \
@@ -15,7 +16,6 @@ DOCKER_OPTS = \
 	-v ~/.ssh:/root/.ssh \
 	-v ~/.aws:/root/.aws \
 	-v ${WORK_DIR}:/workspace/${PROJECT} \
-	-v ${DATA_ROOT}/nuscenes/v1.0-mini:/workspace/${PROJECT}/data/nuscenes \
 	-v ${CKPTS_ROOT}:/workspace/${PROJECT}/ckpts \
 	--shm-size=1G \
 	--ipc=host \
@@ -31,11 +31,20 @@ DOCKER_BUILD_ARGS = \
 	--build-arg WANDB_API_KEY \
 
 docker-build:
-	nvidia-docker image build -f $(DOCKER_FILE) -t $(DOCKER_IMAGE) \
+	nvidia-docker image build \
+	-f $(DOCKER_FILE) \
+	-t $(DOCKER_IMAGE) \
 	$(DOCKER_BUILD_ARGS) .
 
-docker-dev:
+docker-dev-local:
 	nvidia-docker run --name $(PROJECT) \
+	-v ${DATA_ROOT_LOCAL}:/workspace/${PROJECT}/data/nuscenes \
+	$(DOCKER_OPTS) \
+	$(DOCKER_IMAGE) bash
+
+docker-dev-apollo:
+	nvidia-docker run --name $(PROJECT) \
+	-v ${DATA_ROOT_APOLLO}:/workspace/${PROJECT}/data/nuscenes \
 	$(DOCKER_OPTS) \
 	$(DOCKER_IMAGE) bash
 
