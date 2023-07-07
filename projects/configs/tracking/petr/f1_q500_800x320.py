@@ -364,5 +364,5 @@ evaluation = dict(interval=12, pipeline=test_pipeline)
 find_unused_parameters=False
 
 runner = dict(type='EpochBasedRunner', max_epochs=total_epochs)
-load_from='ckpts/fcos3d_vovnet_imgbackbone-remapped.pth'
+load_from='ckpts/f1/fcos3d_vovnet_imgbackbone-remapped.pth'
 resume_from=None

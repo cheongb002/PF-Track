@@ -3,7 +3,7 @@
 CONFIG=$1
 GPUS=$2
 PORT=${PORT:-28500}
-JOB_STR="${USER}-$(date +%y-%m-%d_%H-%M-%S)"
+JOB_STR="pf_track-$(date +%y-%m-%d_%H-%M-%S)"
 
 
 TORCH_CUDNN_V8_API_ENABLED=1 \
