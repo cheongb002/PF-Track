@@ -1,6 +1,6 @@
 # Base image
-ARG PYTORCH="1.10.0"
-ARG CUDA="11.3"
+ARG PYTORCH="2.0.1"
+ARG CUDA="11.7"
 ARG CUDNN="8"
 
 FROM pytorch/pytorch:${PYTORCH}-cuda${CUDA}-cudnn${CUDNN}-devel
@@ -57,36 +57,17 @@ RUN pip install \
     # dataset specific tools
     pycocotools==2.0.4 \
     nuscenes-devkit==1.1.7 \
-    motmetrics==1.1.3
+    motmetrics==1.1.3 \
+    openmim
 
 # Install OpenMMLab packages
-ARG MMCV="1.4.0"
-ARG MMDET="v2.24.1"
-ARG MMSEG="v0.20.2"
-ARG MMDET3D="v0.17.1"
 ENV FORCE_CUDA="1"
 
 # Optional: SimpleTrack for BEV visualization
 RUN git clone https://github.com/tusen-ai/SimpleTrack && cd SimpleTrack && \
     pip install -e .
 
-RUN pip install mmcv-full==${MMCV} -f https://download.openmmlab.com/mmcv/dist/cu113/torch${PYTORCH}/index.html
+RUN mim install mmengine mmcv mmdet "mmdet3d==1.2.0"
 
-WORKDIR /workspace/mmlab
-RUN git clone https://github.com/open-mmlab/mmdetection.git && cd mmdetection && \
-    git checkout ${MMDET} && \
-    pip install -r requirements/build.txt && pip install -e .
-ENV PYTHONPATH="/workspace/mmlab/mmdetection:$PYTHONPATH"
-
-RUN git clone https://github.com/open-mmlab/mmsegmentation.git && cd mmsegmentation && \
-    git checkout ${MMSEG} && \
-    pip install -e .
-ENV PYTHONPATH="/workspace/mmlab/mmsegmentation:$PYTHONPATH"
-
-RUN git clone https://github.com/open-mmlab/mmdetection3d.git && cd mmdetection3d && \
-    git checkout ${MMDET3D} && \
-    pip install -e .
-ENV PYTHONPATH="/workspace/mmlab/mmdetection3d:$PYTHONPATH"
-
-WORKDIR /workspace/pf_track
-RUN git config --global --add safe.directory /workspace/pf_track
+WORKDIR /workspace/pf_track2
+RUN git config --global --add safe.directory /workspace/pf_track2

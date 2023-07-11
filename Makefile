@@ -1,5 +1,5 @@
 WORK_DIR=${PWD}
-PROJECT=pf_track
+PROJECT=pf_track2
 DOCKER_IMAGE=bcheong/${PROJECT}:latest
 DOCKER_FILE=docker/Dockerfile-pftrack
 DATA_ROOT_LOCAL=/media/brian/Data2/nuscenes/v1.0-mini
