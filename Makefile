@@ -3,6 +3,8 @@ PROJECT=pf_track2
 DOCKER_IMAGE=bcheong/${PROJECT}:latest
 DOCKER_FILE=docker/Dockerfile-pftrack
 DATA_ROOT_LOCAL=/media/brian/Data2/nuscenes/v1.0-mini
+# DATA_ROOT_LOCAL=/media/brian/Data2/nuscenes/v1.0-trainval
+
 DATA_ROOT_APOLLO=/scratch/hpc_nas/datasets/nuscenes/v1.0-trainval
 OUTPUT_APOLLO=/home/bcheong/job_artifacts
 CKPTS_ROOT=${PWD}/ckpts

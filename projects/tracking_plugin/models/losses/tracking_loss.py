@@ -4,19 +4,14 @@
 # Modified from PETR (https://github.com/megvii-research/PETR)
 # Copyright (c) 2022 megvii-model. All Rights Reserved.
 # ------------------------------------------------------------------------
-from turtle import forward
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from mmcv.runner import force_fp32
-from mmdet.models import LOSSES
-from mmdet.models import build_loss
-from mmdet.core import (build_assigner, reduce_mean, multi_apply, build_sampler)
-from projects.mmdet3d_plugin.core.bbox.util import normalize_bbox
+from mmdet3d.registry import MODELS
+from mmdet.models.utils import multi_apply
+
 from .tracking_loss_base import TrackingLossBase
 
 
-@LOSSES.register_module()
+@MODELS.register_module()
 class TrackingLoss(TrackingLossBase):
     def __init__(self,
                  *args,

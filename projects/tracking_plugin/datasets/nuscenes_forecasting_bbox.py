@@ -1,10 +1,12 @@
 # ------------------------------------------------------------------------
 # Copyright (c) 2023 toyota research instutute.
 # ------------------------------------------------------------------------
+import copy
+from typing import List, Tuple
+
+import numpy as np
 from nuscenes.utils.data_classes import Box as NuScenesBox
-from typing import Tuple, List, Dict
 from pyquaternion import Quaternion
-import numpy as np, copy
 
 
 class NuScenesForecastingBox(NuScenesBox):

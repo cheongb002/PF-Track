@@ -14,6 +14,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from mmcv.cnn import Conv2d, Linear
+from mmdet3d.registry import MODELS, TASK_UTILS
 from mmdet.models.dense_heads.anchor_free_head import AnchorFreeHead
 from mmdet.models.layers import NormedLinear
 from mmdet.models.layers.transformer import inverse_sigmoid
@@ -21,7 +22,6 @@ from mmdet.models.utils import multi_apply
 from mmengine.model.weight_init import bias_init_with_prob
 from mmengine.structures import InstanceData
 
-from mmdet3d.registry import MODELS, TASK_UTILS
 from projects.PETR.petr.utils import normalize_bbox
 
 
@@ -446,7 +446,7 @@ class PETRHead(AnchorFreeHead):
         masks = x.new_ones((batch_size, num_cams, input_img_h, input_img_w))
         for img_id in range(batch_size):
             for cam_id in range(num_cams):
-                img_h, img_w, _ = img_metas[img_id]['img_shape'][cam_id]
+                img_h, img_w = img_metas[img_id]['img_shape'][cam_id]
                 masks[img_id, cam_id, :img_h, :img_w] = 0
         x = self.input_proj(x.flatten(0, 1))
         x = x.view(batch_size, num_cams, *x.shape[-3:])

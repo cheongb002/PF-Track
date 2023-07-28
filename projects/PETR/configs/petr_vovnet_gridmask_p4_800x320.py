@@ -1,7 +1,7 @@
 _base_ = [
-    '../../../configs/_base_/datasets/nus-3d.py',
-    '../../../configs/_base_/default_runtime.py',
-    '../../../configs/_base_/schedules/cyclic-20e.py'
+    '../../../projects/configs/_base_/datasets/nus-3d.py',
+    '../../../projects/configs/_base_/default_runtime.py',
+    '../../../projects/configs/_base_/schedules/cyclic-20e.py'
 ]
 backbone_norm_cfg = dict(type='LN', requires_grad=True)
 custom_imports = dict(imports=['projects.PETR.petr'])
@@ -120,7 +120,7 @@ backend_args = None
 
 db_sampler = dict(
     data_root=data_root,
-    info_path=data_root + 'nuscenes_dbinfos_train.pkl',
+    info_path=data_root + 'mmlab-v2/tracking_forecasting-mini_infos_train.pkl',
     rate=1.0,
     prepare=dict(
         filter_by_difficulty=[-1],
@@ -296,7 +296,7 @@ find_unused_parameters = False
 
 # pretrain_path can be found here:
 # https://drive.google.com/file/d/1ABI5BoQCkCkP4B0pO5KBJ3Ni0tei0gZi/view
-load_from = '/mnt/d/fcos3d_vovnet_imgbackbone-remapped.pth'
+load_from = 'ckpts/f1/fcos3d_vovnet_imgbackbone-remapped.pth'
 resume = False
 
 # --------------Original---------------

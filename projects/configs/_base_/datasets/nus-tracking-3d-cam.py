@@ -14,9 +14,16 @@ dataset_type = 'NuScenesTrackingDataset'
 data_root = './data/nuscenes/'
 # Input modality for nuScenes dataset, this is consistent with the submission
 # format which requires the information in input_modality.
-input_modality = dict(use_lidar=True, use_camera=False)
-data_prefix = dict(pts='samples/LIDAR_TOP', img='', sweeps='sweeps/LIDAR_TOP')
-
+input_modality = dict(use_lidar=True, use_camera=True)
+data_prefix = dict(
+    pts='samples/LIDAR_TOP',
+    CAM_FRONT='samples/CAM_FRONT',
+    CAM_FRONT_LEFT='samples/CAM_FRONT_LEFT',
+    CAM_FRONT_RIGHT='samples/CAM_FRONT_RIGHT',
+    CAM_BACK='samples/CAM_BACK',
+    CAM_BACK_RIGHT='samples/CAM_BACK_RIGHT',
+    CAM_BACK_LEFT='samples/CAM_BACK_LEFT',
+    sweeps='sweeps/LIDAR_TOP')
 # Example to use different file client
 # Method 1: simply set the data root and let the file I/O module
 # automatically infer from prefix (not support LMDB and Memcache yet)
@@ -32,61 +39,108 @@ data_prefix = dict(pts='samples/LIDAR_TOP', img='', sweeps='sweeps/LIDAR_TOP')
 #      }))
 backend_args = None
 
+ida_aug_conf = {
+    "resize_lim": (0.47, 0.625),
+    "final_dim": (320, 800),
+    "bot_pct_lim": (0.0, 0.0),
+    "rot_lim": (0.0, 0.0),
+    "H": 900,
+    "W": 1600,
+    "rand_flip": True,
+}
+
 train_pipeline = [
+    # dict(
+    #     type='LoadPointsFromFile', # visualization purpose
+    #     coord_type='LIDAR',
+    #     load_dim=5,
+    #     use_dim=5,
+    #     backend_args=backend_args),
+    # dict(
+    #     type='LoadPointsFromMultiSweeps',
+    #     sweeps_num=9,
+    #     load_dim=5,
+    #     use_dim=5,
+    #     pad_empty_sweeps=True,
+    #     remove_close=True,
+    #     backend_args=backend_args),
+    # dict(
+    #     type='PointsRangeFilter',
+    #     point_cloud_range=[-54.0, -54.0, -5.0, 54.0, 54.0, 3.0]),
+    # dict(type='PointShuffle'),
+    # dict(
+    #     type='BEVLoadMultiViewImageFromFiles',
+    #     to_float32=True,
+    #     color_type='color',
+    #     backend_args=backend_args),
     dict(
-        type='LoadPointsFromFile',
-        coord_type='LIDAR',
-        load_dim=5,
-        use_dim=5,
+        type='LoadMultiViewImageFromFiles',
+        to_float32=True,
         backend_args=backend_args),
-    dict(
-        type='LoadPointsFromMultiSweeps',
-        sweeps_num=10,
-        backend_args=backend_args),
-    dict(type='LoadAnnotations3D', with_bbox_3d=True, with_label_3d=True),
-    dict(
-        type='GlobalRotScaleTrans',
-        rot_range=[-0.3925, 0.3925],
-        scale_ratio_range=[0.95, 1.05],
-        translation_std=[0, 0, 0]),
-    dict(type='RandomFlip3D', flip_ratio_bev_horizontal=0.5),
-    dict(type='PointsRangeFilter', point_cloud_range=point_cloud_range),
-    dict(type='ObjectRangeFilter', point_cloud_range=point_cloud_range),
-    dict(type='ObjectNameFilter', classes=class_names),
-    dict(type='PointShuffle'),
-    dict(
-        type='Pack3DDetInputs',
-        keys=['points', 'gt_bboxes_3d', 'gt_labels_3d'])
+    dict(type='TrackLoadAnnotations3D', 
+         with_bbox_3d=True, 
+         with_label_3d=True, 
+         with_forecasting=True),
+    dict(type='TrackInstanceRangeFilter', point_cloud_range=point_cloud_range),
+    dict(type='TrackObjectNameFilter', classes=class_names),
 ]
+
+train_pipeline_multiframe = [
+    dict(type='TrackResizeCropFlipImage', data_aug_conf = ida_aug_conf, training=True),
+    dict(type='Pack3DTrackInputsTrack', 
+         keys=[
+            'points', 'gt_bboxes_3d', 'gt_labels_3d', 'instance_inds', 'img', 
+            'gt_forecasting_locs', 'gt_forecasting_masks', 'gt_forecasting_types'],
+        meta_keys=[
+            'cam2img', 'ori_cam2img', 'lidar2cam', 'lidar2img', 'cam2lidar',
+            'ori_lidar2img', 'img_aug_matrix', 'box_type_3d', 'sample_idx',
+            'lidar_path', 'lidar2global', 'img_path', 'transformation_3d_flow', 'pcd_rotation',
+            'pcd_scale_factor', 'pcd_trans', 'img_aug_matrix',
+            'lidar_aug_matrix', 'num_pts_feats', 'timestamp', 'pad_shape'
+        ])
+]
+
 test_pipeline = [
-    dict(
-        type='LoadPointsFromFile',
-        coord_type='LIDAR',
-        load_dim=5,
-        use_dim=5,
-        backend_args=backend_args),
-    dict(
-        type='LoadPointsFromMultiSweeps',
-        sweeps_num=10,
-        test_mode=True,
-        backend_args=backend_args),
-    dict(
-        type='MultiScaleFlipAug3D',
-        img_scale=(1333, 800),
-        pts_scale_ratio=1,
-        flip=False,
-        transforms=[
-            dict(
-                type='GlobalRotScaleTrans',
-                rot_range=[0, 0],
-                scale_ratio_range=[1., 1.],
-                translation_std=[0, 0, 0]),
-            dict(type='RandomFlip3D'),
-            dict(
-                type='PointsRangeFilter', point_cloud_range=point_cloud_range)
-        ]),
-    dict(type='Pack3DDetInputs', keys=['points'])
+    dict(type='LoadMultiViewImageFromFiles',
+         to_float32=True,
+         backend_args=backend_args),
+    # dict(
+    #     type='BEVLoadMultiViewImageFromFiles',
+    #     to_float32=True,
+    #     color_type='color',
+    #     backend_args=backend_args),
+    # dict(
+    #     type='LoadPointsFromFile',
+    #     coord_type='LIDAR',
+    #     load_dim=5,
+    #     use_dim=5,
+    #     backend_args=backend_args),
+    # dict(
+    #     type='LoadPointsFromMultiSweeps',
+    #     sweeps_num=9,
+    #     load_dim=5,
+    #     use_dim=5,
+    #     pad_empty_sweeps=True,
+    #     remove_close=True,
+    #     backend_args=backend_args),
+    # dict(
+    #     type='PointsRangeFilter',
+    #     point_cloud_range=[-54.0, -54.0, -5.0, 54.0, 54.0, 3.0]),
 ]
+
+test_pipeline_multiframe = [
+    dict(type='TrackResizeCropFlipImage', data_aug_conf = ida_aug_conf, training=False),
+    dict(
+        type='Pack3DTrackInputs',
+        keys=['img'],
+        meta_keys=[
+            'cam2img', 'ori_cam2img', 'lidar2cam', 'lidar2img', 'cam2lidar',
+            'ori_lidar2img', 'img_aug_matrix', 'box_type_3d', 'sample_idx',
+            'lidar_path', 'img_path', 'num_pts_feats', 'timestamp', 'lidar2global',
+            'pad_shape'
+        ])
+]
+
 # construct a pipeline for data and gt loading in show function
 # please keep its loading function consistent with test_pipeline (e.g. client)
 eval_pipeline = [
@@ -104,15 +158,18 @@ eval_pipeline = [
     dict(type='Pack3DDetInputs', keys=['points'])
 ]
 train_dataloader = dict(
-    batch_size=4,
+    batch_size=1,
     num_workers=4,
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
     dataset=dict(
         type=dataset_type,
+        num_frames_per_sample=1, # default single frame training
+        forecasting=True,
         data_root=data_root,
-        ann_file='nuscenes_infos_train.pkl',
+        ann_file='mmlab-v2/tracking_forecasting_infos-mini_train.pkl',
         pipeline=train_pipeline,
+        pipeline_multiframe=train_pipeline_multiframe,
         metainfo=metainfo,
         modality=input_modality,
         test_mode=False,
@@ -129,9 +186,11 @@ test_dataloader = dict(
     sampler=dict(type='DefaultSampler', shuffle=False),
     dataset=dict(
         type=dataset_type,
+        num_frames_per_sample=1,
         data_root=data_root,
-        ann_file='nuscenes_infos_val.pkl',
+        ann_file='mmlab-v2/tracking_forecasting-mini_infos_val.pkl',
         pipeline=test_pipeline,
+        pipeline_multiframe=test_pipeline_multiframe,
         metainfo=metainfo,
         modality=input_modality,
         data_prefix=data_prefix,
@@ -146,9 +205,11 @@ val_dataloader = dict(
     sampler=dict(type='DefaultSampler', shuffle=False),
     dataset=dict(
         type=dataset_type,
+        num_frames_per_sample=1,
         data_root=data_root,
-        ann_file='nuscenes_infos_val.pkl',
+        ann_file='mmlab-v2/tracking_forecasting-mini_infos_val.pkl',
         pipeline=test_pipeline,
+        pipeline_multiframe=test_pipeline_multiframe,
         metainfo=metainfo,
         modality=input_modality,
         test_mode=True,
