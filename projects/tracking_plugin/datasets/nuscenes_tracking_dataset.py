@@ -14,7 +14,6 @@ import numpy as np
 from mmdet3d.datasets import NuScenesDataset
 from mmdet3d.registry import DATASETS
 from mmengine.dataset import Compose
-from pyquaternion import Quaternion
 
 
 @DATASETS.register_module()
@@ -73,16 +72,17 @@ class NuScenesTrackingDataset(NuScenesDataset):
         # return to the normal frame order
         data_queue = data_queue[::-1]
 
-        # construct dict of lists
-        sample_data = dict()
-        for key in data_queue[-1].keys():
-            sample_data[key] = list()
-        for d in data_queue:
-            for k, v in d.items():
-                sample_data[k].append(v)
+        # # construct dict of lists
+        # sample_data = dict()
+        # for key in data_queue[-1].keys():
+        #     sample_data[key] = list()
+        # for d in data_queue:
+        #     for k, v in d.items():
+        #         sample_data[k].append(v)
 
         # multiframe processing
-        data = self.pipeline_multiframe(sample_data)
+        # data = self.pipeline_multiframe(sample_data)
+        data = self.pipeline_multiframe(data_queue)
         return data
 
     def parse_data_info(self, info: dict) -> Union[List[dict], dict]:

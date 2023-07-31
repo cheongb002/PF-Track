@@ -97,21 +97,18 @@ class TrackObjectNameFilter(ObjectNameFilter):
 
 @TRANSFORMS.register_module()
 class TrackResizeCropFlipImage(ResizeCropFlipImage):
-    def transform(self, results):
+    def transform(self, data_queue:list):
         """Call function to pad images, masks, semantic segmentation maps.
         Args:
             results (dict): Result dict from loading pipeline.
         Returns:
             dict: Updated result dict.
         """
-        frame_num = len(results['timestamp'])
-        imgs = results["img"]
-        N = len(imgs[0])
-        new_imgs = [[] for _ in range(frame_num)]
         resize, resize_dims, crop, flip, rotate = self._sample_augmentation()
-        for t in range(frame_num):
-            for i in range(N):
-                img = Image.fromarray(np.uint8(imgs[t][i]))
+        for frame_idx, data in enumerate(data_queue):
+            new_imgs_frame = []
+            for cam_idx, img in enumerate(data['img']):
+                img = Image.fromarray(np.uint8(img))
                 # augmentation (resize, crop, horizontal flip, rotate)
                 img, ida_mat = self._img_transform(
                     img,
@@ -121,14 +118,17 @@ class TrackResizeCropFlipImage(ResizeCropFlipImage):
                     flip=flip,
                     rotate=rotate,
                 )
-                new_imgs[t].append(np.array(img).astype(np.float32))
-                results['intrinsics'][t][i][:3, :3] = ida_mat @ results['intrinsics'][t][i][:3, :3]
+                new_imgs_frame.append(np.array(img).astype(np.float32))
+                data_queue[frame_idx]['intrinsics'][cam_idx][:3, :3] = \
+                    ida_mat @ data_queue[frame_idx]['intrinsics'][cam_idx][:3, :3]
+            data_queue[frame_idx]['img'] = new_imgs_frame
+            data_queue[frame_idx]['lidar2img'] = \
+                [intrinsics @ extrinsics.T for intrinsics, extrinsics in zip(
+                    data_queue[frame_idx]['intrinsics'],
+                    data_queue[frame_idx]['extrinsics']
+                )]
 
-        results["img"] = new_imgs
-        for t in range(frame_num):
-            results['lidar2img'][t] = [results['intrinsics'][t][i] @ results['extrinsics'][t][i].T for i in range(len(results['extrinsics'][t]))]
-
-        return results
+        return data_queue
 
 
 @TRANSFORMS.register_module()

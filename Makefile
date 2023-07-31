@@ -34,19 +34,27 @@ DOCKER_BUILD_ARGS = \
 	--build-arg WANDB_API_KEY \
 
 docker-build:
-	nvidia-docker image build \
+	docker image build \
+	--runtime=nvidia \
+	--gpus all \
 	-f $(DOCKER_FILE) \
 	-t $(DOCKER_IMAGE) \
 	$(DOCKER_BUILD_ARGS) .
 
 docker-dev-local:
-	nvidia-docker run --name $(PROJECT) \
+	docker run \
+	--runtime=nvidia \
+	--gpus all \
+	--name $(PROJECT) \
 	-v ${DATA_ROOT_LOCAL}:/workspace/${PROJECT}/data/nuscenes \
 	$(DOCKER_OPTS) \
 	$(DOCKER_IMAGE) bash
 
 docker-dev-apollo:
-	nvidia-docker run --name $(PROJECT) \
+	docker run \
+	--runtime=nvidia \
+	--gpus all \
+	--name $(PROJECT) \
 	-v ${DATA_ROOT_APOLLO}:/workspace/${PROJECT}/data/nuscenes \
 	-v ${OUTPUT_APOLLO}:/workspace/${PROJECT}/work_dirs \
 	$(DOCKER_OPTS) \

@@ -1,14 +1,14 @@
 # ------------------------------------------------------------------------
 # Copyright (c) 2023 toyota research instutute.
 # ------------------------------------------------------------------------
-from copy import deepcopy
+from typing import List, Union
 
 import torch
 import torch.nn as nn
 from mmdet3d.registry import MODELS
-from mmdet3d.structures import bbox3d2result
+from mmdet3d.structures.det3d_data_sample import ForwardResults, OptSampleList
+from mmengine.structures import InstanceData
 
-from projects.PETR.petr.grid_mask import GridMask
 from projects.PETR.petr.petr import PETR
 from projects.PETR.petr.petr_head import pos2posemb3d
 from projects.tracking_plugin.core.instances import Instances
@@ -56,6 +56,20 @@ class Cam3DTracker(PETR):
         # Inference time tracker
         self.runtime_tracker = RunTimeTracker(**runtime_tracker)
     
+    def forward(
+            self, 
+            inputs: Union[dict, List[dict]], 
+            data_samples: OptSampleList = None, 
+            mode: str = 'loss', 
+            **kwargs) -> ForwardResults:
+        if mode == 'loss':
+            return self.loss(inputs, data_samples, **kwargs)
+        elif mode == 'predict':
+            return self.predict(inputs, data_samples, **kwargs)
+        else:
+            raise RuntimeError(f'Invalid mode "{mode}". '
+                               'Only supports loss, predict mode')
+
     def generate_empty_instance(self):
         """Generate empty instance slots at the beginning of tracking"""
         track_instances = Instances((1, 1))
@@ -262,7 +276,6 @@ class Cam3DTracker(PETR):
             self,
             inputs:dict,
             data_samples,
-            img_metas:dict={},
             gt_bboxes_3d=None,
             gt_labels_3d=None,
             gt_forecasting_locs=None,
@@ -293,34 +306,32 @@ class Cam3DTracker(PETR):
             dict: Losses of different branches.
         """
         img = inputs['imgs']
-        timestamps = [ds.metainfo['timestamp'] for ds in data_samples]
-        lidar2global = [ds.metainfo['lidar2global'] for ds in data_samples]
         batch_size = len(img)
         num_frame = img[0].shape[0]
 
         # Image features, one clip at a time for checkpoint usages
-        img_feats = self.extract_clip_imgs_feats(img_metas=img_metas, img=img)
+        img_feats = self.extract_clip_imgs_feats(img=img)
 
         # transform labels to a temporal frame-first sense
-        ff_gt_bboxes_list, ff_gt_labels_list, ff_instance_ids = list(), list(), list()
-        for i in range(num_frame):
-            ff_gt_bboxes_list.append([gt_bboxes_3d[j][i] for j in range(batch_size)])
-            ff_gt_labels_list.append([gt_labels_3d[j][i] for j in range(batch_size)])
-            ff_instance_ids.append([instance_inds[j][i] for j in range(batch_size)])
+        # ff_gt_bboxes_list, ff_gt_labels_list, ff_instance_ids = list(), list(), list()
+        # for i in range(num_frame):
+        #     ff_gt_bboxes_list.append([gt_bboxes_3d[j][i] for j in range(batch_size)])
+        #     ff_gt_labels_list.append([gt_labels_3d[j][i] for j in range(batch_size)])
+        #     ff_instance_ids.append([instance_inds[j][i] for j in range(batch_size)])
         
         # Empty the runtime_tracker
         # Use PETR head to decode the bounding boxes on every frame
         outs = list()
         next_frame_track_instances = self.generate_empty_instance()
-        img_metas_keys = img_metas[0].keys()
+        # img_metas_keys = img_metas[0].keys()
 
         # Running over all the frames one by one
         self.runtime_tracker.empty()
         for frame_idx in range(num_frame):
-            img_metas_single_frame = list()
-            for batch_idx in range(batch_size):
-                img_metas_single_sample = {key: img_metas[batch_idx][key][frame_idx] for key in img_metas_keys}
-                img_metas_single_frame.append(img_metas_single_sample)
+            # img_metas_single_frame = list()
+            # for batch_idx in range(batch_size):
+            #     img_metas_single_sample = {key: img_metas[batch_idx][key][frame_idx] for key in img_metas_keys}
+            #     img_metas_single_frame.append(img_metas_single_sample)
 
             # PETR detection head
             track_instances = next_frame_track_instances
@@ -382,163 +393,80 @@ class Cam3DTracker(PETR):
         losses = self.criterion(outs)
         self.runtime_tracker.empty()
         return losses
-
-    def forward_test(
-            self,
-            inputs:dict,
-            data_samples,
-            mode:str='train',
-            img_metas:dict={},
-            gt_bboxes_3d=None,
-            gt_labels_3d=None,
-            gt_forecasting_locs=None,
-            gt_forecasting_masks=None,
-            instance_inds=None):
-        """ This function is not used for MOT, so I haven't paid attention to this.
-        """
-        img = inputs['imgs']
-        timestamps = [ds.metainfo['timestamp'] for ds in data_samples]
-        lidar2global = [ds.metainfo['lidar2global'] for ds in data_samples]
-        batch_size = len(img)
-        num_frame = img[0].shape[0]
-
-        # Image features
-        img_feats = self.extract_clip_imgs_feats(img_metas=img_metas, img=img)
-
-        outs = list()
-        next_frame_track_instances = self.generate_empty_instance()
-        img_metas_keys = img_metas[0].keys()
-        self.runtime_tracker.empty()
-        for frame_idx in range(num_frame):
-            img_metas_single_frame = list()
-            for batch_idx in range(batch_size):
-                img_metas_single_sample = {key: img_metas[batch_idx][key][frame_idx] for key in img_metas_keys}
-                img_metas_single_frame.append(img_metas_single_sample)
-            
-            # PETR detection head
-            track_instances = next_frame_track_instances
-            out = self.pts_bbox_head(img_feats[frame_idx], img_metas_single_frame, 
-                                     track_instances.query_feats, track_instances.query_embeds, 
-                                     track_instances.reference_points)
-
-            # 1. Record the information into the track instances cache
-            track_instances = self.load_detection_output_into_cache(track_instances, out)
-            out['track_instances'] = track_instances
-
-            # 2. Spatial-temporal Reasoning
-            track_instances = self.STReasoner(track_instances)
-            track_instances = self.frame_summarization(track_instances)
-            out['all_cls_scores'][-1][0, :] = track_instances.logits
-            out['all_bbox_preds'][-1][0, :] = track_instances.bboxes
-
-            if self.STReasoner.future_reasoning:
-                # motion forecasting has the shape of [num_query, T, 2]
-                out['all_motion_forecasting'] = track_instances.motion_predictions.clone()
-            else:
-                out['all_motion_forecasting'] = None
-            
-            active_mask = (track_instances.scores >= self.runtime_tracker.threshold)
-            active_track_instances = track_instances[active_mask]
-            
-            if self.if_update_ego and frame_idx < num_frame - 1:
-                active_track_instances = self.update_ego(
-                    active_track_instances, lidar2global[frame_idx], lidar2global[frame_idx + 1])
-            if self.motion_prediction and frame_idx < num_frame - 1:
-                time_delta = timestamps[frame_idx + 1] - timestamps[frame_idx]
-                active_track_instances = self.update_reference_points(
-                    active_track_instances, time_delta, use_prediction=self.motion_prediction_ref_update)
-            if frame_idx < num_frame - 1:
-                active_track_instances = self.STReasoner.sync_pos_embedding(active_track_instances, self.query_embedding)
-
-            empty_track_instances = self.generate_empty_instance()
-            next_frame_track_instances = Instances.cat([empty_track_instances, active_track_instances])
-            self.runtime_tracker.frame_index += 1
-
-            # if frame_idx == 0:
-            if frame_idx == num_frame - 1:
-                bbox_list = self.pts_bbox_head.get_bboxes(out, img_metas_single_frame, rescale=rescale, tracking=False)
-        
-        bbox_results = [
-            bbox3d2result(bboxes, scores, labels)
-            for bboxes, scores, labels, _, _, _ in bbox_list
-        ]
-        return bbox_results
     
     def predict(
             self,
             inputs:dict,
             data_samples):
-        # assume single frame
-        img = inputs['imgs']
-        batch_img_metas = [ds.metainfo for ds in data_samples]
-        timestamps = [ds.metainfo['timestamp'][0] for ds in data_samples]
-        lidar2global = [ds.metainfo['lidar2global'] for ds in data_samples]
-        batch_size = len(img)
-        num_frame = img[0].shape[0]
-        assert num_frame == 1, "Only support single frame prediction at a time"
-        
+        imgs = inputs['imgs'] # bs, num frames, num cameras (6), C, H, W
+        batch_size = len(imgs)
+        assert batch_size == 1, "Only support single bs prediction"
+        num_frame = imgs[0].shape[0]
+        assert num_frame == 1, "Only support single frame prediction"
+
         # backbone images
-        img_feats = self.extract_clip_imgs_feats(img_metas=batch_img_metas, img=img)
-        
+        img_feats = self.extract_clip_imgs_feats(img=imgs)
+
         # image metas
-        all_img_metas = list()
-        img_metas_keys = batch_img_metas[0].keys()
-        for i in range(batch_size):
-            img_metas_single_sample = dict()
-            for key in img_metas_keys:
-                # join the fields of every timestamp
-                if type(batch_img_metas[i][key][0]) == list:
-                    contents = deepcopy(batch_img_metas[i][key][0])
-                    for j in range(1, num_frame):
-                        contents += batch_img_metas[i][key][j]
-                # pick the representative one
-                else:
-                    contents = deepcopy(batch_img_metas[i][key][0])
-            img_metas_single_sample[key] = contents
-            all_img_metas.append(img_metas_single_sample)
+        # all_img_metas = list()
+        # img_metas_keys = batch_img_metas[0].keys()
+        # for i in range(batch_size):
+        #     img_metas_single_sample = dict()
+        #     for key in img_metas_keys:
+        #         # join the fields of every timestamp
+        #         if type(batch_img_metas[i][key][0]) == list:
+        #             contents = deepcopy(batch_img_metas[i][key][0])
+        #             for j in range(1, num_frame):
+        #                 contents += batch_img_metas[i][key][j]
+        #         # pick the representative one
+        #         else:
+        #             contents = deepcopy(batch_img_metas[i][key][0])
+        #     img_metas_single_sample[key] = contents
+        #     all_img_metas.append(img_metas_single_sample)
         
         # new sequence
-        if self.runtime_tracker.timestamp is None or abs(timestamps[0] - self.runtime_tracker.timestamp) > 10:
-            self.runtime_tracker.timestamp = timestamps[0]
+        timestamp = data_samples[0][0].metainfo['timestamp']
+        if self.runtime_tracker.timestamp is None or abs(timestamp - self.runtime_tracker.timestamp) > 10:
+            self.runtime_tracker.timestamp = timestamp
             self.runtime_tracker.current_seq += 1
             self.runtime_tracker.track_instances = None
             self.runtime_tracker.current_id = 0
             self.runtime_tracker.l2g = None
             self.runtime_tracker.time_delta = 0
             self.runtime_tracker.frame_index = 0
-        self.runtime_tracker.time_delta = timestamps[0] - self.runtime_tracker.timestamp
-        self.runtime_tracker.timestamp = timestamps[0]
+        self.runtime_tracker.time_delta = timestamp - self.runtime_tracker.timestamp
+        self.runtime_tracker.timestamp = timestamp
         
         # processing the queries from t-1
         prev_active_track_instances = self.runtime_tracker.track_instances
-        for frame_idx in range(num_frame):
-            img_metas_single_frame = list()
-            for batch_idx in range(batch_size):
-                img_metas_single_sample = {key: batch_img_metas[batch_idx][key][frame_idx] for key in img_metas_keys}
-                img_metas_single_frame.append(img_metas_single_sample)            
+        for frame_idx in range(num_frame): # TODO remove this for loop, assume num_frame = 1 for prediction
+            img_metas_single_frame = [ds[frame_idx].metainfo for ds in data_samples]
+            # for batch_idx in range(batch_size):
+            #     img_metas_single_sample = {key: batch_img_metas[batch_idx][key][frame_idx] for key in img_metas_keys}
+            #     img_metas_single_frame.append(img_metas_single_sample)            
             # 1. Update the information of previous active tracks
             if prev_active_track_instances is None:
                 track_instances = self.generate_empty_instance()
             else:
                 if self.motion_prediction:
                     time_delta = self.runtime_tracker.time_delta
-                    prev_active_track_instances = self.update_reference_points(prev_active_track_instances,
-                                                                               time_delta,
-                                                                               use_prediction=self.motion_prediction_ref_update,
-                                                                               tracking=True)
+                    prev_active_track_instances = self.update_reference_points(
+                        prev_active_track_instances, time_delta, 
+                        use_prediction=self.motion_prediction_ref_update, tracking=True)
                 if self.if_update_ego:
-                    prev_active_track_instances = self.update_ego(prev_active_track_instances,
-                                                                  self.runtime_tracker.l2g, l2g[0][frame_idx])
+                    prev_active_track_instances = self.update_ego(
+                        prev_active_track_instances, self.runtime_tracker.l2g, 
+                        img_metas_single_frame[0]['lidar2global'])
                 prev_active_track_instances = self.STReasoner.sync_pos_embedding(prev_active_track_instances, self.query_embedding)
                 track_instances = Instances.cat([self.generate_empty_instance(), prev_active_track_instances])
-            
-            self.runtime_tracker.l2g = lidar2global[frame_idx]
-            self.runtime_tracker.timestamp = timestamps[0]
+
+            self.runtime_tracker.l2g = img_metas_single_frame[0]['lidar2global']
+            self.runtime_tracker.timestamp = img_metas_single_frame[0]['timestamp']
 
             # 2. PETR detection head
-            out = self.pts_bbox_head(img_feats[frame_idx], img_metas_single_frame, 
-                                     track_instances.query_feats, track_instances.query_embeds, 
-                                     track_instances.reference_points)
+            out = self.pts_bbox_head(
+                img_feats[frame_idx], img_metas_single_frame, track_instances.query_feats,
+                track_instances.query_embeds, track_instances.reference_points)
 
             # 3. Record the information into the track instances cache
             track_instances = self.load_detection_output_into_cache(track_instances, out)
@@ -579,7 +507,7 @@ class Cam3DTracker(PETR):
             score_mask = (track_instances.scores > self.runtime_tracker.output_threshold)
             out['all_masks'] = score_mask.clone()
 
-            bbox_list = self.pts_bbox_head.get_bboxes(out, img_metas_single_frame, rescale=rescale, tracking=True)
+            bbox_list = self.pts_bbox_head.get_bboxes(out, img_metas_single_frame, tracking=True)
             # self.runtime_tracker.update_active_tracks(active_track_instances)
             self.runtime_tracker.update_active_tracks(track_instances, active_mask)
             
@@ -591,10 +519,16 @@ class Cam3DTracker(PETR):
             track_bbox3d2result(bboxes, scores, labels, obj_idxes, track_scores, forecasting)
             for bboxes, scores, labels, obj_idxes, track_scores, forecasting in bbox_list
         ]
-        bbox_results[0]['track_ids'] = [f'{self.runtime_tracker.current_seq}-{i}' for i in bbox_results[0]['track_ids'].long().cpu().numpy().tolist()]
-        return bbox_results
-    
-    def extract_clip_imgs_feats(self, img_metas, img):
+        if self.tracking:
+            bbox_results[0]['track_ids'] = [f'{self.runtime_tracker.current_seq}-{i}' for i in bbox_results[0]['track_ids'].long().cpu().numpy().tolist()]
+
+        results_list_3d = [InstanceData(metainfo=results) for results in bbox_results]
+        detsamples = self.add_pred_to_datasample(
+            data_samples[0], data_instances_3d=results_list_3d
+        )
+        return detsamples
+
+    def extract_clip_imgs_feats(self, img):
         """Extract the features of multi-frame images
         Args:
             img_metas (list[dict], optional): Meta information of each sample.
@@ -610,31 +544,33 @@ class Cam3DTracker(PETR):
 
         # backbone images
         # get all the images and let backbone infer for once
-        all_imgs, all_img_metas = list(), list()
+        # all_imgs, all_img_metas = list(), list()
+        all_imgs = list()
+        dummy_img_metas = [dict() for _ in range(batch_size)] # metas not actually required to extract features
         for frame_idx in range(num_frame):
             # single frame image, N * NumCam * C * H * W
             img_single_frame = torch.stack([p[frame_idx] for p in img], dim=0)
             all_imgs.append(img_single_frame)
         # image metas
-        img_metas_keys = img_metas[0].keys()
-        for i in range(batch_size):
-            img_metas_single_sample = dict()
-            for key in img_metas_keys:
-                # join the fields of every timestamp
-                if type(img_metas[i][key][0]) == list:
-                    contents = deepcopy(img_metas[i][key][0])
-                    for j in range(1, num_frame):
-                        contents += img_metas[i][key][j]
-                # pick the representative one
-                else:
-                    contents = deepcopy(img_metas[i][key][0])
-            img_metas_single_sample[key] = contents
-            all_img_metas.append(img_metas_single_sample)
+        # img_metas_keys = img_metas[0].keys()
+        # for i in range(batch_size):
+        #     img_metas_single_sample = dict()
+        #     for key in img_metas_keys:
+        #         # join the fields of every timestamp
+        #         if type(img_metas[i][key][0]) == list:
+        #             contents = deepcopy(img_metas[i][key][0])
+        #             for j in range(1, num_frame):
+        #                 contents += img_metas[i][key][j]
+        #         # pick the representative one
+        #         else:
+        #             contents = deepcopy(img_metas[i][key][0])
+        #     img_metas_single_sample[key] = contents
+        #     all_img_metas.append(img_metas_single_sample)
 
         # all imgs N * (T * NumCam) * C * H * W
         all_imgs = torch.cat(all_imgs, dim=1)
         # img_feats List[Tensor of batch 0, ...], each tensor BS * (T * NumCam) * C * H * W
-        all_img_feats = self.extract_feat(img=all_imgs, img_metas=all_img_metas)
+        all_img_feats = self.extract_feat(img=all_imgs, img_metas=dummy_img_metas)
 
         # per frame feature maps
         img_feats = list()
@@ -686,7 +622,7 @@ def track_bbox3d2result(bboxes, scores, labels, obj_idxes, track_scores, forecas
             - forecasting (torh.Tensor, optional): Motion forecasting
     """
     result_dict = dict(
-        boxes_3d=bboxes.to('cpu'),
+        bboxes_3d=bboxes.to('cpu'),
         scores_3d=scores.cpu(),
         labels_3d=labels.cpu(),
         track_scores=track_scores.cpu(),

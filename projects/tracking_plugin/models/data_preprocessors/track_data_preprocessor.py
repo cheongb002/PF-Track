@@ -9,7 +9,7 @@ from typing import List, Tuple, Union
 @MODELS.register_module()
 class TrackDataPreprocessor(Det3DDataPreprocessor):
     def forward(self,
-                data: Union[dict, List[dict]],
+                data: List[dict],
                 training: bool = False) -> Union[dict, List[dict]]:
         """Perform normalization, padding and bgr2rgb conversion based on
         ``BaseDataPreprocessor``.
@@ -18,55 +18,51 @@ class TrackDataPreprocessor(Det3DDataPreprocessor):
             data (dict or List[dict]): Data from dataloader. The dict contains
                 the whole batch data, when it is a list[dict], the list
                 indicates test time augmentation.
+
+                Expecting a data dict with a batch of data, where each
+                sample in the batch is a clip of multiple frames
             training (bool): Whether to enable training time augmentation.
                 Defaults to False.
 
         Returns:
             dict or List[dict]: Data in the same format as the model input.
         """
-        breakpoint()
-        if isinstance(data, list):
-            num_augs = len(data)
-            aug_batch_data = []
-            for aug_id in range(num_augs):
-                single_aug_batch_data = self.simple_process(
-                    data[aug_id], training)
-                aug_batch_data.append(single_aug_batch_data)
-            return aug_batch_data
-
-        else:
-            return self.simple_process(data, training)
-
-    def _get_pad_shape(self, data: dict) -> List[Tuple[int, int]]:
-        # fix the indexing to get H W to second last and last dims, accounting for extra
-        # leading dims
-        _batch_inputs = data['inputs']['img']
-        # Process data with `pseudo_collate`.
-        if is_seq_of(_batch_inputs, torch.Tensor):
-            batch_pad_shape = []
-            for ori_input in _batch_inputs:
-                pad_h = int(
-                    np.ceil(ori_input.shape[-2] /
-                            self.pad_size_divisor)) * self.pad_size_divisor
-                pad_w = int(
-                    np.ceil(ori_input.shape[-1] /
-                            self.pad_size_divisor)) * self.pad_size_divisor
-                batch_pad_shape.append((pad_h, pad_w))
-        # Process data with `default_collate`.
-        elif isinstance(_batch_inputs, torch.Tensor):
-            assert _batch_inputs.dim() == 4, (
-                'The input of `ImgDataPreprocessor` should be a NCHW tensor '
-                'or a list of tensor, but got a tensor with shape: '
-                f'{_batch_inputs.shape}')
-            pad_h = int(
-                np.ceil(_batch_inputs.shape[-2] /
-                        self.pad_size_divisor)) * self.pad_size_divisor
-            pad_w = int(
-                np.ceil(_batch_inputs.shape[-1] /
-                        self.pad_size_divisor)) * self.pad_size_divisor
-            batch_pad_shape = [(pad_h, pad_w)] * _batch_inputs.shape[0]
-        else:
-            raise TypeError('Output of `cast_data` should be a list of dict '
-                            'or a tuple with inputs and data_samples, but got '
-                            f'{type(data)}: {data}')
-        return batch_pad_shape
+        data_dict = {
+            'data_samples': [],
+            'inputs': {},
+        }
+        for batch_idx, data_i in enumerate(data):
+            processed_data_i = self.simple_process(data_i, training)
+            data_dict['data_samples'].append(processed_data_i['data_samples'])
+            for key, val in processed_data_i['inputs'].items():
+                if key not in data_dict['inputs']:
+                    data_dict['inputs'][key] = []
+                data_dict['inputs'][key].append(val)            
+        return data_dict
+    
+    def split_data_into_frames(self, data_i: dict) -> List[dict]:
+        """Split data_i into multiple frames
+        Args:
+            data_i (dict): Data from dataloader. The dict contains
+                the whole batch data, when it is a list[dict], the list
+                indicates test time augmentation.
+        Returns:
+            List[dict]: List of data_i for each frame
+        """
+        data_queue = []
+        for frame_idx in range(len(data_i['data_samples'])):
+            data_queue.append(self.get_data_i_for_frame(data_i, frame_idx))
+        return data_queue
+    
+    def get_data_i_for_frame(self, data_i: dict, frame_idx: int) -> dict:
+        data_i_frame_j = {
+            'data_samples': [data_i['data_samples'][frame_idx]],
+            'inputs': {},
+        }
+        for key, val in data_i['inputs'].items():
+            if is_seq_of(val, torch.Tensor):
+                data_i_frame_j['inputs'][key] = [val[frame_idx]]
+            else:
+                data_i_frame_j['inputs'][key] = [val]
+        return data_i_frame_j
+        

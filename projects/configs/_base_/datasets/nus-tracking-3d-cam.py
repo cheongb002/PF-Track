@@ -9,7 +9,7 @@ class_names = [
     'car', 'truck', 'trailer', 'bus', 'construction_vehicle', 'bicycle',
     'motorcycle', 'pedestrian', 'traffic_cone', 'barrier'
 ]
-metainfo = dict(classes=class_names)
+metainfo = dict(classes=class_names, version='v1.0-mini')
 dataset_type = 'NuScenesTrackingDataset'
 data_root = './data/nuscenes/'
 # Input modality for nuScenes dataset, this is consistent with the submission
@@ -96,7 +96,7 @@ train_pipeline_multiframe = [
             'ori_lidar2img', 'img_aug_matrix', 'box_type_3d', 'sample_idx',
             'lidar_path', 'lidar2global', 'img_path', 'transformation_3d_flow', 'pcd_rotation',
             'pcd_scale_factor', 'pcd_trans', 'img_aug_matrix',
-            'lidar_aug_matrix', 'num_pts_feats', 'timestamp', 'pad_shape'
+            'lidar_aug_matrix', 'num_pts_feats', 'timestamp', 'pad_shape', 'img_shape'
         ])
 ]
 
@@ -137,7 +137,7 @@ test_pipeline_multiframe = [
             'cam2img', 'ori_cam2img', 'lidar2cam', 'lidar2img', 'cam2lidar',
             'ori_lidar2img', 'img_aug_matrix', 'box_type_3d', 'sample_idx',
             'lidar_path', 'img_path', 'num_pts_feats', 'timestamp', 'lidar2global',
-            'pad_shape'
+            'pad_shape', 'img_shape'
         ])
 ]
 
@@ -157,6 +157,12 @@ eval_pipeline = [
         backend_args=backend_args),
     dict(type='Pack3DDetInputs', keys=['points'])
 ]
+
+# pkl paths
+train_pkl_path = 'mmlab-v2/tracking_forecasting_infos-mini_train.pkl'
+test_pkl_path = 'mmlab-v2/tracking_forecasting-mini_infos_val.pkl'
+val_pkl_path = 'mmlab-v2/tracking_forecasting-mini_infos_val.pkl'
+
 train_dataloader = dict(
     batch_size=1,
     num_workers=4,
@@ -167,7 +173,7 @@ train_dataloader = dict(
         num_frames_per_sample=1, # default single frame training
         forecasting=True,
         data_root=data_root,
-        ann_file='mmlab-v2/tracking_forecasting_infos-mini_train.pkl',
+        ann_file=train_pkl_path,
         pipeline=train_pipeline,
         pipeline_multiframe=train_pipeline_multiframe,
         metainfo=metainfo,
@@ -188,7 +194,7 @@ test_dataloader = dict(
         type=dataset_type,
         num_frames_per_sample=1,
         data_root=data_root,
-        ann_file='mmlab-v2/tracking_forecasting-mini_infos_val.pkl',
+        ann_file=test_pkl_path,
         pipeline=test_pipeline,
         pipeline_multiframe=test_pipeline_multiframe,
         metainfo=metainfo,
@@ -207,7 +213,7 @@ val_dataloader = dict(
         type=dataset_type,
         num_frames_per_sample=1,
         data_root=data_root,
-        ann_file='mmlab-v2/tracking_forecasting-mini_infos_val.pkl',
+        ann_file=val_pkl_path,
         pipeline=test_pipeline,
         pipeline_multiframe=test_pipeline_multiframe,
         metainfo=metainfo,
@@ -220,7 +226,7 @@ val_dataloader = dict(
 val_evaluator = dict(
     type='NuScenesMetric',
     data_root=data_root,
-    ann_file=data_root + 'nuscenes_infos_val.pkl',
+    ann_file=data_root + val_pkl_path,
     metric='bbox',
     backend_args=backend_args)
 test_evaluator = val_evaluator

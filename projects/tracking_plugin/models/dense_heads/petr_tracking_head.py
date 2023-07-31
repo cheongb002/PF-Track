@@ -10,9 +10,11 @@
 # Modified from mmdetection3d (https://github.com/open-mmlab/mmdetection3d)
 # Copyright (c) OpenMMLab. All rights reserved.
 # ------------------------------------------------------------------------
+from typing import List, Dict, Any
+
 import torch
 import torch.nn.functional as F
-from mmdet3d.registry import MODELS, TASK_UTILS
+from mmdet3d.registry import MODELS
 from mmdet.models.layers.transformer import inverse_sigmoid
 
 from projects.PETR.petr.petr_head import PETRHead
@@ -50,7 +52,15 @@ class PETRCamTrackingHead(PETRHead):
                                           strict, missing_keys,
                                           unexpected_keys, error_msgs)
     
-    def forward(self, mlvl_feats, img_metas, query_targets, query_embeds, reference_points, proj_feature=None, proj_pos=None):
+    def forward(
+            self, 
+            mlvl_feats, 
+            img_metas:List[Dict[str, Any]], 
+            query_targets, 
+            query_embeds, 
+            reference_points, 
+            proj_feature=None, 
+            proj_pos=None):
         """Forward function.
         Args:
             mlvl_feats (tuple[Tensor]): Features from the upstream
@@ -75,9 +85,8 @@ class PETRCamTrackingHead(PETRHead):
         input_img_h, input_img_w = img_metas[0]['pad_shape']
         masks = x.new_ones((batch_size, num_cams, input_img_h, input_img_w))
         for img_id in range(batch_size):
-            for cam_id in range(num_cams):
-                img_h, img_w, _ = img_metas[img_id]['img_shape'][cam_id]
-                masks[img_id, cam_id, :img_h, :img_w] = 0
+            img_h, img_w = img_metas[img_id]['img_shape']
+            masks[img_id, :num_cams, :img_h, :img_w] = 0
         x = self.input_proj(x.flatten(0, 1))
         x = x.view(batch_size, num_cams, *x.shape[-3:])
         # interpolate masks to have the same spatial shape with x
@@ -171,7 +180,7 @@ class PETRCamTrackingHead(PETRHead):
         }
         return outs
 
-    def get_bboxes(self, preds_dicts, img_metas, rescale=False, tracking=False):
+    def get_bboxes(self, preds_dicts, img_metas, tracking=False):
         """Generate bboxes from bbox head predictions.
         Args:
             preds_dicts (tuple[list[dict]]): Prediction results.
