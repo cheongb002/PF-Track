@@ -5,9 +5,14 @@ point_cloud_range = [-50, -50, -5, 50, 50, 3]
 # ego-coordinate point cloud range could bring a little promotion in nuScenes.
 # point_cloud_range = [-50, -50.8, -5, 50, 49.2, 3]
 # For nuScenes we usually do 10-class detection
+# class_names = [
+#     'car', 'truck', 'trailer', 'bus', 'construction_vehicle', 'bicycle',
+#     'motorcycle', 'pedestrian', 'traffic_cone', 'barrier'
+# ]
 class_names = [
-    'car', 'truck', 'trailer', 'bus', 'construction_vehicle', 'bicycle',
-    'motorcycle', 'pedestrian', 'traffic_cone', 'barrier'
+    'car', 'truck', 'bus', 'trailer', 
+    'motorcycle', 'bicycle', 'pedestrian', 
+    'construction_vehicle', 'traffic_cone', 'barrier'
 ]
 metainfo = dict(classes=class_names, version='v1.0-mini')
 dataset_type = 'NuScenesTrackingDataset'

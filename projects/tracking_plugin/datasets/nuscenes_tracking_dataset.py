@@ -102,7 +102,7 @@ class NuScenesTrackingDataset(NuScenesDataset):
             extrinsics = []
             for cam_type, cam_info in info['images'].items():
                 # obtain lidar to image transformation matrix
-                lidar2cam_rt = np.array(cam_info['lidar2cam'])
+                lidar2cam_rt = np.array(cam_info['lidar2cam']).T
                 intrinsic = np.array(cam_info['cam2img'])
                 viewpad = np.eye(4)
                 viewpad[:intrinsic.shape[0], :intrinsic.shape[1]] = intrinsic
