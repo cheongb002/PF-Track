@@ -27,10 +27,13 @@ class TrackDataPreprocessor(Det3DDataPreprocessor):
         Returns:
             dict or List[dict]: Data in the same format as the model input.
         """
+        # breakpoint()
         data_dict = {
             'data_samples': [],
             'inputs': {},
         }
+        if not isinstance(data, list):
+            data = [data]
         for batch_idx, data_i in enumerate(data):
             processed_data_i = self.simple_process(data_i, training)
             data_dict['data_samples'].append(processed_data_i['data_samples'])
@@ -38,6 +41,7 @@ class TrackDataPreprocessor(Det3DDataPreprocessor):
                 if key not in data_dict['inputs']:
                     data_dict['inputs'][key] = []
                 data_dict['inputs'][key].append(val)            
+        # breakpoint()
         return data_dict
     
     def split_data_into_frames(self, data_i: dict) -> List[dict]:

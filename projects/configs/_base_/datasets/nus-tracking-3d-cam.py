@@ -159,7 +159,7 @@ eval_pipeline = [
 ]
 
 # pkl paths
-train_pkl_path = 'mmlab-v2/tracking_forecasting_infos-mini_train.pkl'
+train_pkl_path = 'mmlab-v2/tracking_forecasting_infos-mini_infos_val.pkl'
 test_pkl_path = 'mmlab-v2/tracking_forecasting-mini_infos_val.pkl'
 val_pkl_path = 'mmlab-v2/tracking_forecasting-mini_infos_val.pkl'
 
@@ -228,6 +228,7 @@ val_evaluator = dict(
     data_root=data_root,
     ann_file=data_root + val_pkl_path,
     metric='bbox',
+    jsonfile_prefix='nuscenes_results',
     backend_args=backend_args)
 test_evaluator = val_evaluator
 

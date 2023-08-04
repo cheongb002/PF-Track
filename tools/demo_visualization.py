@@ -6,7 +6,7 @@
 # Based on https://github.com/nutonomy/nuscenes-devkit
 # ---------------------------------------------
 
-import mmcv
+import mmengine
 import os
 import argparse
 from nuscenes.nuscenes import NuScenes
@@ -607,12 +607,12 @@ def make_videos(fig_dir, fig_names, video_name, video_dir):
 
 if __name__ == '__main__':
     args = parse_args()
-    data_infos = mmcv.load(args.data_infos_path)['infos']
+    data_infos = mmengine.load(args.data_infos_path)['infos']
     data_info_sample_tokens = [info['token'] for info in data_infos]
 
     nusc = NuScenes(version='v1.0-mini', dataroot='./data/nuscenes/', verbose=True)
     # render_annotation('7603b030b42a4b1caa8c443ccc1a7d52')
-    results = mmcv.load(args.result)
+    results = mmengine.load(args.result)
     sample_token_list = list(results['results'].keys())
 
     pbar = tqdm(total=len(sample_token_list))

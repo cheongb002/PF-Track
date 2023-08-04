@@ -398,6 +398,7 @@ class Cam3DTracker(PETR):
             self,
             inputs:dict,
             data_samples):
+        # breakpoint()
         imgs = inputs['imgs'] # bs, num frames, num cameras (6), C, H, W
         batch_size = len(imgs)
         assert batch_size == 1, "Only support single bs prediction"
@@ -406,7 +407,7 @@ class Cam3DTracker(PETR):
 
         # backbone images
         img_feats = self.extract_clip_imgs_feats(img=imgs)
-
+        # breakpoint()
         # image metas
         # all_img_metas = list()
         # img_metas_keys = batch_img_metas[0].keys()
@@ -467,7 +468,7 @@ class Cam3DTracker(PETR):
             out = self.pts_bbox_head(
                 img_feats[frame_idx], img_metas_single_frame, track_instances.query_feats,
                 track_instances.query_embeds, track_instances.reference_points)
-
+            # breakpoint()
             # 3. Record the information into the track instances cache
             track_instances = self.load_detection_output_into_cache(track_instances, out)
             out['track_instances'] = track_instances
@@ -510,11 +511,11 @@ class Cam3DTracker(PETR):
             bbox_list = self.pts_bbox_head.get_bboxes(out, img_metas_single_frame, tracking=True)
             # self.runtime_tracker.update_active_tracks(active_track_instances)
             self.runtime_tracker.update_active_tracks(track_instances, active_mask)
-            
+
             # each time, only run one frame
             self.runtime_tracker.frame_index += 1
             break
-        
+
         bbox_results = [
             track_bbox3d2result(bboxes, scores, labels, obj_idxes, track_scores, forecasting)
             for bboxes, scores, labels, obj_idxes, track_scores, forecasting in bbox_list
@@ -526,6 +527,7 @@ class Cam3DTracker(PETR):
         detsamples = self.add_pred_to_datasample(
             data_samples[0], data_instances_3d=results_list_3d
         )
+        # breakpoint()
         return detsamples
 
     def extract_clip_imgs_feats(self, img):
