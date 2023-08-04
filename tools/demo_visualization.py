@@ -411,7 +411,7 @@ def lidiar_render(sample_token, data, out_path=None):
             num_pts=-1 if 'num_pts' not in content else int(content['num_pts']),
             tracking_id=content['tracking_id'],
             tracking_name=content['tracking_name'],
-            tracking_score=-1.0 if 'tracking_score' not in content else float(content['tracking_score']),
+            tracking_score=-1.0 if 'detection_score' not in content else float(content['detection_score']),
         ))
     gt_annotations = EvalBoxes()
     pred_annotations = EvalBoxes()
@@ -521,11 +521,8 @@ def render_sample_data(
             assert False
         elif sensor_modality == 'camera':
             # Load boxes and image.
-            boxes = [TrackingBox(
-                         'predicted',
-                         record['translation'], record['size'], Quaternion(record['rotation']),
-                         tracking_id=record['tracking_id'].split('-')[-1]) for record in
-                     pred_data['results'][sample_toekn] if record['tracking_score'] > 0.2]
+            boxes = [TrackingBox('predicted', record['translation'], record['size'], Quaternion(record['rotation']), tracking_id='0') 
+                     for record in pred_data['results'][sample_toekn] if record['detection_score'] > 0.2]
 
             data_path, boxes_pred, camera_intrinsic = get_predicted_data(sample_data_token,
                                                                          box_vis_level=box_vis_level, pred_anns=boxes)
