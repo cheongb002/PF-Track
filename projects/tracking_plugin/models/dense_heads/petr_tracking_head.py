@@ -85,7 +85,7 @@ class PETRCamTrackingHead(PETRHead):
         input_img_h, input_img_w = img_metas[0]['pad_shape']
         masks = x.new_ones((batch_size, num_cams, input_img_h, input_img_w))
         for img_id in range(batch_size):
-            img_h, img_w = img_metas[img_id]['img_shape']
+            img_h, img_w = img_metas[img_id]['batch_input_shape']
             masks[img_id, :num_cams, :img_h, :img_w] = 0
         x = self.input_proj(x.flatten(0, 1))
         x = x.view(batch_size, num_cams, *x.shape[-3:])

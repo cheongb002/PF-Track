@@ -101,7 +101,7 @@ train_pipeline_multiframe = [
             'ori_lidar2img', 'img_aug_matrix', 'box_type_3d', 'sample_idx',
             'lidar_path', 'lidar2global', 'img_path', 'transformation_3d_flow', 'pcd_rotation',
             'pcd_scale_factor', 'pcd_trans', 'img_aug_matrix',
-            'lidar_aug_matrix', 'num_pts_feats', 'timestamp', 'pad_shape', 'img_shape'
+            'lidar_aug_matrix', 'num_pts_feats', 'timestamp', 'pad_shape'
         ])
 ]
 
@@ -142,7 +142,7 @@ test_pipeline_multiframe = [
             'cam2img', 'ori_cam2img', 'lidar2cam', 'lidar2img', 'cam2lidar',
             'ori_lidar2img', 'img_aug_matrix', 'box_type_3d', 'sample_idx',
             'lidar_path', 'img_path', 'num_pts_feats', 'timestamp', 'lidar2global',
-            'pad_shape', 'img_shape'
+            'pad_shape'
         ])
 ]
 
