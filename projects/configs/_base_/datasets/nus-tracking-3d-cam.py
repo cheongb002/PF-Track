@@ -233,7 +233,7 @@ val_evaluator = dict(
     data_root=data_root,
     ann_file=data_root + val_pkl_path,
     metric='bbox',
-    jsonfile_prefix='nuscenes_results',
+    jsonfile_prefix='work_dirs/nuscenes_results',
     backend_args=backend_args)
 test_evaluator = val_evaluator
 
