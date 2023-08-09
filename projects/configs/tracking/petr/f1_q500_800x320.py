@@ -75,6 +75,12 @@ train_pipeline_multiframe = [
 ]
 
 test_pipeline = [
+    dict(
+        type='LoadPointsFromFile', # visualization purpose
+        coord_type='LIDAR',
+        load_dim=5,
+        use_dim=5,
+        file_client_args=file_client_args),
     dict(type='LoadMultiViewImageFromFiles'),
     # dict(
     #     type='MultiScaleFlipAug3D',
@@ -95,7 +101,7 @@ test_pipeline_multiframe = [
     dict(type='TrackNormalizeMultiviewImage', **img_norm_cfg),
     dict(type='TrackPadMultiViewImage', size_divisor=32),
     dict(type='FormatBundle3DTrack'),
-    dict(type='Collect3D', keys=['img', 'timestamp', 'l2g_r_mat', 'l2g_t', 'l2g'])
+    dict(type='Collect3D', keys=['points', 'img', 'timestamp', 'l2g_r_mat', 'l2g_t', 'l2g'])
 ]
 
 data = dict(
@@ -119,23 +125,23 @@ data = dict(
              pipeline_multiframe=test_pipeline_multiframe,
              data_root=data_root, test_mode=True,
              classes=class_names, modality=input_modality,
-             ann_file=data_root + 'tracking_forecasting_infos_val.pkl',
+             ann_file=data_root + 'tracking_forecasting-mini_infos_val.pkl',
              num_frames_per_sample=1,), # when inference, set bs=1
     test=dict(type=dataset_type, pipeline=test_pipeline, 
              pipeline_multiframe=test_pipeline_multiframe,
              data_root=data_root, test_mode=True,
              classes=class_names, modality=input_modality,
-             ann_file=data_root + 'tracking_forecasting_infos_val.pkl',
+             ann_file=data_root + 'tracking_forecasting-mini_infos_val.pkl',
              num_frames_per_sample=1,), # when inference, set bs=1 
     test_tracking=dict(type=dataset_type, pipeline=test_pipeline,
               pipeline_multiframe=test_pipeline_multiframe,
               data_root=data_root, test_mode=True,
               classes=class_names, modality=input_modality,
-              ann_file=data_root + 'tracking_forecasting_infos_val.pkl',
+              ann_file=data_root + 'tracking_forecasting-mini_infos_val.pkl',
               num_frames_per_sample=1,),
-    visualization=dict(type=dataset_type, pipeline=train_pipeline,
-              pipeline_multiframe=train_pipeline_multiframe,
-              data_root=data_root, test_mode=False,
+    visualization=dict(type=dataset_type, pipeline=test_pipeline,
+              pipeline_multiframe=test_pipeline_multiframe,
+              data_root=data_root, test_mode=True,
               classes=class_names, modality=input_modality,
               ann_file=data_root + 'tracking_forecasting-mini_infos_val.pkl',
               num_frames_per_sample=1,))

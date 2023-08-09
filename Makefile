@@ -38,7 +38,10 @@ docker-build:
 	$(DOCKER_BUILD_ARGS) .
 
 docker-dev-local:
-	nvidia-docker run --name $(PROJECT) \
+	docker run \
+	--runtime=nvidia \
+	--gpus all \
+	--name $(PROJECT) \
 	-v ${DATA_ROOT_LOCAL}:/workspace/${PROJECT}/data/nuscenes \
 	$(DOCKER_OPTS) \
 	$(DOCKER_IMAGE) bash
