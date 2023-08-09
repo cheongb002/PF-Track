@@ -10,51 +10,18 @@
 # Modified from mmdetection3d (https://github.com/open-mmlab/mmdetection3d)
 # Copyright (c) OpenMMLab. All rights reserved.
 # ------------------------------------------------------------------------
-import math
-import warnings
-from typing import Sequence
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from mmcv.cnn.bricks.transformer import (BaseTransformerLayer,
-                                         TransformerLayerSequence,
-                                         build_transformer_layer_sequence)
-from mmcv.cnn.bricks.drop import build_dropout
-from mmdet.models.utils.builder import TRANSFORMER
-from mmcv.cnn import (build_activation_layer, build_conv_layer,
-                      build_norm_layer, xavier_init)
-from mmcv.runner.base_module import BaseModule
-from mmcv.cnn.bricks.registry import (ATTENTION,TRANSFORMER_LAYER,
-                                      TRANSFORMER_LAYER_SEQUENCE)
-from mmcv.utils import (ConfigDict, build_from_cfg, deprecated_api_warning,
-                        to_2tuple)
-import copy
-import torch.utils.checkpoint as cp
+from mmdet3d.registry import MODELS
+
+from projects.PETR.petr.petr_transformer import PETRTransformer
 
 
-@TRANSFORMER.register_module()
-class PETRTrackingTransformer(BaseModule):
+@MODELS.register_module()
+class PETRTrackingTransformer(PETRTransformer):
     """Implements the DETR transformer.
     Adding a field of target to denote the query features.
     If target is None, the behavior is identical to PETRTransformer.
     """
-    def __init__(self, encoder=None, decoder=None, init_cfg=None, cross=False):
-        super(PETRTrackingTransformer, self).__init__(init_cfg=init_cfg)
-        if encoder is not None:
-            self.encoder = build_transformer_layer_sequence(encoder)
-        else:
-            self.encoder = None
-        self.decoder = build_transformer_layer_sequence(decoder)
-        self.embed_dims = self.decoder.embed_dims
-        self.cross = cross
-    
-    def init_weights(self):
-        # follow the official DETR to init parameters
-        for m in self.modules():
-            if hasattr(m, 'weight') and m.weight.dim() > 1:
-                xavier_init(m, distribution='uniform')
-        self._is_init = True
     
     def forward(self, target, x, mask, query_embed, pos_embed, reg_branch=None):
         bs, n, c, h, w = x.shape

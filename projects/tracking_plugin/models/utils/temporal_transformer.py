@@ -1,28 +1,12 @@
 # ------------------------------------------------------------------------
 # Copyright (c) 2022 Toyota Research Institute
 # ------------------------------------------------------------------------
-import math
-import warnings
-from typing import Sequence
-import pickle
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from mmcv.cnn.bricks.transformer import (BaseTransformerLayer,
-                                         TransformerLayerSequence,
-                                         build_transformer_layer_sequence)
-from mmcv.cnn.bricks.drop import build_dropout
-from mmdet.models.utils.builder import TRANSFORMER
-from mmcv.cnn import (build_activation_layer, build_conv_layer,
-                      build_norm_layer, xavier_init)
-from mmcv.runner.base_module import BaseModule
-from mmcv.cnn.bricks.registry import (ATTENTION,TRANSFORMER_LAYER,
-                                      TRANSFORMER_LAYER_SEQUENCE)
-from mmcv.utils import (ConfigDict, build_from_cfg, deprecated_api_warning,
-                        to_2tuple)
+from mmdet3d.registry import MODELS
+from mmengine.model import BaseModule
+from mmengine.model.weight_init import xavier_init
 
 
-@TRANSFORMER.register_module()
+@MODELS.register_module()
 class TemporalTransformer(BaseModule):
     """Implement a DETR transformer.
     Adapting the input and output to the motion reasoning purpose.
@@ -30,10 +14,10 @@ class TemporalTransformer(BaseModule):
     def __init__(self, encoder=None, decoder=None, init_cfg=None, cross=False):
         super(TemporalTransformer, self).__init__(init_cfg=init_cfg)
         if encoder is not None:
-            self.encoder = build_transformer_layer_sequence(encoder)
+            self.encoder = MODELS.build(encoder)
         else:
             self.encoder = None
-        self.decoder = build_transformer_layer_sequence(decoder)
+        self.decoder = MODELS.build(decoder)
         self.embed_dims = self.decoder.embed_dims
         self.cross = cross
         
