@@ -11,7 +11,7 @@ import torch
 from mmdet3d.registry import TASK_UTILS
 from mmdet.models.task_modules import BaseBBoxCoder
 
-from projects.tracking_plugin.core.utils import denormalize_bbox
+from projects.PETR.petr.utils import denormalize_bbox
 
 
 @TASK_UTILS.register_module()

@@ -18,7 +18,7 @@ from mmdet.models.task_modules import build_assigner, build_sampler
 from mmdet.models.utils.misc import multi_apply
 from mmdet.utils.dist_utils import reduce_mean
 
-from projects.tracking_plugin.core.utils import normalize_bbox
+from projects.PETR.petr.utils import normalize_bbox
 
 
 @MODELS.register_module()

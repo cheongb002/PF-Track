@@ -15,7 +15,7 @@ import torch
 from mmdet3d.registry import MODELS
 from mmdet.utils.dist_utils import reduce_mean
 
-from projects.tracking_plugin.core.utils import normalize_bbox
+from projects.PETR.petr.utils import normalize_bbox
 
 from .tracking_loss import TrackingLoss
 

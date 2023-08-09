@@ -393,7 +393,7 @@ class Cam3DTracker(PETR):
         losses = self.criterion(outs)
         self.runtime_tracker.empty()
         return losses
-    
+
     def predict(
             self,
             inputs:dict,
@@ -527,6 +527,7 @@ class Cam3DTracker(PETR):
         detsamples = self.add_pred_to_datasample(
             data_samples[0], data_instances_3d=results_list_3d
         )
+        # breakpoint()
         return detsamples
 
     def extract_clip_imgs_feats(self, img):
