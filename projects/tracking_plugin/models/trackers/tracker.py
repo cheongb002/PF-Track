@@ -486,31 +486,32 @@ class Cam3DTracker(PETR):
                 out['all_motion_forecasting'] = None
 
             # 5. Track class filtering: before decoding bboxes, only leave the objects under tracking categories
-            max_cat = torch.argmax(out['all_cls_scores'][-1, 0, :].sigmoid(), dim=-1)
-            related_cat_mask = (max_cat < 7) # we set the first 7 classes as the tracking classes of nuscenes
-            track_instances = track_instances[related_cat_mask]
-            out['all_cls_scores'] = out['all_cls_scores'][:, :, related_cat_mask, :]
-            out['all_bbox_preds'] = out['all_bbox_preds'][:, :, related_cat_mask, :]
-            if out['all_motion_forecasting'] is not None:
-                out['all_motion_forecasting'] = out['all_motion_forecasting'][related_cat_mask, ...]
+            if self.tracking:
+                max_cat = torch.argmax(out['all_cls_scores'][-1, 0, :].sigmoid(), dim=-1)
+                related_cat_mask = (max_cat < 7) # we set the first 7 classes as the tracking classes of nuscenes
+                track_instances = track_instances[related_cat_mask]
+                out['all_cls_scores'] = out['all_cls_scores'][:, :, related_cat_mask, :]
+                out['all_bbox_preds'] = out['all_bbox_preds'][:, :, related_cat_mask, :]
+                if out['all_motion_forecasting'] is not None:
+                    out['all_motion_forecasting'] = out['all_motion_forecasting'][related_cat_mask, ...]
 
-            # 6. assign ids
-            active_mask = (track_instances.scores > self.runtime_tracker.threshold)
-            for i in range(len(track_instances)):
-                if track_instances.obj_idxes[i] < 0:
-                    track_instances.obj_idxes[i] = self.runtime_tracker.current_id 
-                    self.runtime_tracker.current_id += 1
-                    if active_mask[i]:
-                        track_instances.track_query_mask[i] = True
-            out['track_instances'] = track_instances
+                # 6. assign ids
+                active_mask = (track_instances.scores > self.runtime_tracker.threshold)
+                for i in range(len(track_instances)):
+                    if track_instances.obj_idxes[i] < 0:
+                        track_instances.obj_idxes[i] = self.runtime_tracker.current_id 
+                        self.runtime_tracker.current_id += 1
+                        if active_mask[i]:
+                            track_instances.track_query_mask[i] = True
+                out['track_instances'] = track_instances
 
-            # 7. Prepare for the next frame and output
-            score_mask = (track_instances.scores > self.runtime_tracker.output_threshold)
-            out['all_masks'] = score_mask.clone()
+                # 7. Prepare for the next frame and output
+                score_mask = (track_instances.scores > self.runtime_tracker.output_threshold)
+                out['all_masks'] = score_mask.clone()
+                self.runtime_tracker.update_active_tracks(track_instances, active_mask)
 
             bbox_list = self.pts_bbox_head.get_bboxes(out, img_metas_single_frame, tracking=True)
             # self.runtime_tracker.update_active_tracks(active_track_instances)
-            self.runtime_tracker.update_active_tracks(track_instances, active_mask)
 
             # each time, only run one frame
             self.runtime_tracker.frame_index += 1
@@ -527,7 +528,6 @@ class Cam3DTracker(PETR):
         detsamples = self.add_pred_to_datasample(
             data_samples[0], data_instances_3d=results_list_3d
         )
-        # breakpoint()
         return detsamples
 
     def extract_clip_imgs_feats(self, img):

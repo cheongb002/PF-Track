@@ -227,6 +227,8 @@ def output_to_nusc_box(detection):
     box_list = []
 
     assert isinstance(box3d, LiDARInstance3DBoxes)
+    # our LiDAR coordinate system -> nuScenes box coordinate system
+    nus_box_dims = box_dims[:, [1, 0, 2]]
     for i in range(len(box3d)):
         quat = pyquaternion.Quaternion(axis=[0, 0, 1], radians=box_yaw[i])
         velocity = (*box3d.tensor[i, 7:9], 0.0)
@@ -236,7 +238,7 @@ def output_to_nusc_box(detection):
         # velo_val * np.cos(velo_ori), velo_val * np.sin(velo_ori), 0.0)
         box = NuScenesForecastingBox(
             box_gravity_center[i],
-            box_dims[i],
+            nus_box_dims[i],
             quat,
             label=labels[i],
             score=scores[i],
