@@ -13,16 +13,15 @@
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from mmcv.runner import force_fp32
-from mmdet.models import LOSSES
-from mmdet.models import build_loss
-from mmdet.core import (build_assigner, reduce_mean, multi_apply, build_sampler)
-from wandb import visualize
-from projects.mmdet3d_plugin.core.bbox.util import normalize_bbox
+from mmdet3d.registry import MODELS
+from mmdet.models.task_modules import build_assigner, build_sampler
+from mmdet.models.utils.misc import multi_apply
+from mmdet.utils.dist_utils import reduce_mean
+
+from projects.PETR.petr.utils import normalize_bbox
 
 
-@LOSSES.register_module()
+@MODELS.register_module()
 class TrackingLossBase(nn.Module):
     """ Naive multi-frame loss
     """
@@ -50,9 +49,9 @@ class TrackingLossBase(nn.Module):
         self.num_classes = num_classes
         self.interm_loss = interm_loss # if compute separate losses for all the decoders
         self.assigner = build_assigner(assigner)
-        self.loss_cls = build_loss(loss_cls)
-        self.loss_bbox = build_loss(loss_bbox)
-        self.loss_iou = build_loss(loss_iou)
+        self.loss_cls = MODELS.build(loss_cls)
+        self.loss_bbox = MODELS.build(loss_bbox)
+        self.loss_iou = MODELS.build(loss_iou)
         sampler_cfg = dict(type='PseudoSampler')
         self.sampler = build_sampler(sampler_cfg, context=self)
 
@@ -68,7 +67,7 @@ class TrackingLossBase(nn.Module):
         else:
             self.code_weights = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.2, 0.2]
         
-        self.code_weights = nn.Parameter(torch.tensor(
+        self.code_weights = nn.parameter.Parameter(torch.tensor(
             self.code_weights, requires_grad=False), requires_grad=False)
         
         self.bg_cls_weight = 0
@@ -372,7 +371,6 @@ class TrackingLossBase(nn.Module):
 
         return loss_dict
 
-    @force_fp32(apply_to=('preds_dicts'))
     def forward(self,
                 preds_dicts):
         """Loss function for multi-frame tracking

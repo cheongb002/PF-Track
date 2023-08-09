@@ -5,12 +5,11 @@
 """
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from ...core.instances import Instances
-from mmcv.cnn import Conv2d, Linear
-from projects.mmdet3d_plugin.models.dense_heads.petr_head import pos2posemb3d
-from mmdet.models.utils.transformer import inverse_sigmoid
-from mmdet.models.utils import build_transformer
+from mmcv.cnn import Linear
+from projects.PETR.petr.petr_head import pos2posemb3d
+from mmdet.models.layers.transformer import inverse_sigmoid
+from mmdet3d.registry import MODELS
 from .utils import time_position_embedding, xyz_ego_transformation, normalize, denormalize
 
 
@@ -163,8 +162,8 @@ class SpatialTemporalReasoner(nn.Module):
         # Modules for history reasoning
         if self.history_reasoning:
             # temporal transformer
-            self.hist_temporal_transformer = build_transformer(self.hist_temporal_transformer)
-            self.spatial_transformer = build_transformer(self.spatial_transformer)
+            self.hist_temporal_transformer = MODELS.build(self.hist_temporal_transformer)
+            self.spatial_transformer = MODELS.build(self.spatial_transformer)
 
             # classification refinement from history
             cls_branch = []
@@ -187,7 +186,7 @@ class SpatialTemporalReasoner(nn.Module):
         # Modules for future reasoning
         if self.future_reasoning:
             # temporal transformer
-            self.fut_temporal_transformer = build_transformer(self.fut_temporal_transformer)
+            self.fut_temporal_transformer = MODELS.build(self.fut_temporal_transformer)
 
             # regression head
             reg_branch = []

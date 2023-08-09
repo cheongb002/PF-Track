@@ -7,161 +7,16 @@
 # Modified from mmdetection3d (https://github.com/open-mmlab/mmdetection3d)
 # Copyright (c) OpenMMLab. All rights reserved.
 # ------------------------------------------------------------------------
+
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import copy
-from mmcv.cnn import Conv2d, Linear, build_activation_layer, bias_init_with_prob
-from mmcv.cnn.bricks.transformer import FFN, build_positional_encoding
-from mmcv.runner import force_fp32
-from mmdet.core import (bbox_cxcywh_to_xyxy, bbox_xyxy_to_cxcywh,
-                        build_assigner, build_sampler, multi_apply,
-                        reduce_mean)
-from mmdet.models.utils import build_transformer
-from mmdet.models import HEADS, build_loss
-from mmdet.models.dense_heads.anchor_free_head import AnchorFreeHead
-from mmdet.models.utils.transformer import inverse_sigmoid
-from mmdet3d.core.bbox.coders import build_bbox_coder
-from projects.mmdet3d_plugin.core.bbox.util import normalize_bbox
-import numpy as np
-from mmcv.cnn import xavier_init, constant_init, kaiming_init
-import math
-from mmdet.models.utils import NormedLinear
+from mmdet3d.registry import MODELS
+from mmdet.models.layers.transformer import inverse_sigmoid
+
+from projects.DETR3D.detr3d.detr3d_head import DETR3DHead
 
 
-def pos2posemb3d(pos, num_pos_feats=128, temperature=10000):
-    scale = 2 * math.pi
-    pos = pos * scale
-    dim_t = torch.arange(num_pos_feats, dtype=torch.float32, device=pos.device)
-    dim_t = temperature ** (2 * (dim_t // 2) / num_pos_feats)
-    pos_x = pos[..., 0, None] / dim_t
-    pos_y = pos[..., 1, None] / dim_t
-    pos_z = pos[..., 2, None] / dim_t
-    pos_x = torch.stack((pos_x[..., 0::2].sin(), pos_x[..., 1::2].cos()), dim=-1).flatten(-2)
-    pos_y = torch.stack((pos_y[..., 0::2].sin(), pos_y[..., 1::2].cos()), dim=-1).flatten(-2)
-    pos_z = torch.stack((pos_z[..., 0::2].sin(), pos_z[..., 1::2].cos()), dim=-1).flatten(-2)
-    posemb = torch.cat((pos_y, pos_x, pos_z), dim=-1)
-    return posemb
-
-
-@HEADS.register_module()
-class DETR3DCamTrackingHead(AnchorFreeHead):
-    def __init__(self,
-                 num_classes,
-                 in_channels,
-                 with_box_refine=False,
-                 as_two_stage=2,
-                 num_reg_fcs=2,
-                 transformer=None,
-                 sync_cls_avg_factor=False,
-                 positional_encoding=dict(
-                     type='SinePositionalEncoding',
-                     num_feats=128,
-                     normalize=True),
-                 code_weights=None,
-                 bbox_coder=None,
-                 train_cfg=dict(
-                     assigner=dict(
-                         type='HungarianAssigner',
-                         cls_cost=dict(type='ClassificationCost', weight=1.),
-                         reg_cost=dict(type='BBoxL1Cost', weight=5.0),
-                         iou_cost=dict(
-                             type='IoUCost', iou_mode='giou', weight=2.0))),
-                 test_cfg=dict(max_per_img=100),
-                 position_range=[-65, -65, -8.0, 65, 65, 8.0],
-                 init_cfg=None,
-                 normedlinear=False,
-                 **kwargs):
-        # NOTE here use `AnchorFreeHead` instead of `TransformerHead`,
-        # since it brings inconvenience when the initialization of
-        # `AnchorFreeHead` is called.
-        if 'code_size' in kwargs:
-            self.code_size = kwargs['code_size']
-        else:
-            self.code_size = 10
-
-        self.with_box_refine = with_box_refine
-        self.as_two_stage = as_two_stage
-        
-        self.num_classes = num_classes
-        self.in_channels = in_channels
-        self.num_reg_fcs = num_reg_fcs
-        self.train_cfg = train_cfg
-        self.test_cfg = test_cfg
-        self.fp16_enabled = False
-        self.embed_dims = 256
-        self.position_range = position_range
-        self.position_level = 0
-        assert 'num_feats' in positional_encoding
-        num_feats = positional_encoding['num_feats']
-        assert num_feats * 2 == self.embed_dims, 'embed_dims should' \
-            f' be exactly 2 times of num_feats. Found {self.embed_dims}' \
-            f' and {num_feats}.'
-        self.act_cfg = transformer.get('act_cfg',
-                                       dict(type='ReLU', inplace=True))
-        self.normedlinear = normedlinear
-
-        # self.code_weights = nn.Parameter(torch.tensor(
-        #     self.code_weights, requires_grad=False), requires_grad=False)
-        self.num_pred = (transformer.decoder.num_layers + 1) if \
-            self.as_two_stage else transformer.decoder.num_layers
-
-        super(DETR3DCamTrackingHead, self).__init__(num_classes, in_channels, init_cfg = init_cfg)
-
-        # self.activate = build_activation_layer(self.act_cfg)
-        # if self.with_multiview or not self.with_position:
-        #     self.positional_encoding = build_positional_encoding(
-        #         positional_encoding)
-        # self.positional_encoding = build_positional_encoding(
-        #         positional_encoding)
-        self.transformer = build_transformer(transformer)
-        self.bbox_coder = build_bbox_coder(bbox_coder)
-        self.pc_range = self.bbox_coder.pc_range
-        self._init_layers()
-
-    def _init_layers(self):
-        """Initialize classification branch and regression branch of head."""
-        cls_branch = []
-        for _ in range(self.num_reg_fcs):
-            cls_branch.append(Linear(self.embed_dims, self.embed_dims))
-            cls_branch.append(nn.LayerNorm(self.embed_dims))
-            cls_branch.append(nn.ReLU(inplace=True))
-        cls_branch.append(Linear(self.embed_dims, self.cls_out_channels))
-        fc_cls = nn.Sequential(*cls_branch)
-
-        reg_branch = []
-        for _ in range(self.num_reg_fcs):
-            reg_branch.append(Linear(self.embed_dims, self.embed_dims))
-            reg_branch.append(nn.ReLU())
-        reg_branch.append(Linear(self.embed_dims, self.code_size))
-        reg_branch = nn.Sequential(*reg_branch)
-
-        def _get_clones(module, N):
-            return nn.ModuleList([copy.deepcopy(module) for i in range(N)])
-
-        if self.with_box_refine:
-            self.cls_branches = _get_clones(fc_cls, self.num_pred)
-            self.reg_branches = _get_clones(reg_branch, self.num_pred)
-        else:
-            self.cls_branches = nn.ModuleList(
-                [fc_cls for _ in range(self.num_pred)])
-            self.reg_branches = nn.ModuleList(
-                [reg_branch for _ in range(self.num_pred)])
-
-        # if not self.as_two_stage:
-        #     self.query_embedding = nn.Embedding(self.num_query,
-        #                                         self.embed_dims * 2)
-        return
-
-    def init_weights(self):
-        """Initialize weights of the transformer head."""
-        # The initialization for transformer is important
-        self.transformer.init_weights()
-        # nn.init.uniform_(self.reference_points.weight.data, 0, 1)
-        if self.loss_cls.use_sigmoid:
-            bias_init = bias_init_with_prob(0.01)
-            for m in self.cls_branches:
-                nn.init.constant_(m[-1].bias, bias_init)
+@MODELS.register_module()
+class DETR3DCamTrackingHead(DETR3DHead):
 
     def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict,
                               missing_keys, unexpected_keys, error_msgs):
@@ -188,11 +43,11 @@ class DETR3DCamTrackingHead(AnchorFreeHead):
                         state_dict[convert_key] = state_dict[k]
                         del state_dict[k]
 
-        super(AnchorFreeHead,
+        super(DETR3DHead,
               self)._load_from_state_dict(state_dict, prefix, local_metadata,
                                           strict, missing_keys,
                                           unexpected_keys, error_msgs)
-    
+
     def forward(self, 
                 mlvl_feats,
                 img_metas,
@@ -271,18 +126,6 @@ class DETR3DCamTrackingHead(AnchorFreeHead):
         }
         return outs
 
-    def _get_target_single(self, * args, **kwargs):
-        pass
-
-    def get_targets(self, * args, **kwargs):
-        pass
-
-    def loss_single(self, * args, **kwargs):
-        pass
-    
-    def loss(self, * args, **kwargs):
-        pass
-
     def get_bboxes(self, preds_dicts, img_metas, rescale=False, tracking=False):
         """Generate bboxes from bbox head predictions.
         Args:
@@ -312,12 +155,3 @@ class DETR3DCamTrackingHead(AnchorFreeHead):
             forecasting = preds['forecasting']
             ret_list.append([bboxes, scores, labels, obj_idxes, track_scores, forecasting])
         return ret_list
-
-
-def nan_to_num(x, nan=0.0, posinf=None, neginf=None):
-    x[torch.isnan(x)]= nan
-    if posinf is not None:
-        x[torch.isposinf(x)] = posinf
-    if neginf is not None:
-        x[torch.isneginf(x)] = posinf
-    return x

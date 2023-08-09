@@ -8,13 +8,13 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 # ------------------------------------------------------------------------
 import torch
-from mmdet.core.bbox import BaseBBoxCoder
-from mmdet.core.bbox.builder import BBOX_CODERS
-from projects.mmdet3d_plugin.core.bbox.util import denormalize_bbox
-import torch.nn.functional as F
+from mmdet3d.registry import TASK_UTILS
+from mmdet.models.task_modules import BaseBBoxCoder
+
+from projects.PETR.petr.utils import denormalize_bbox
 
 
-@BBOX_CODERS.register_module()
+@TASK_UTILS.register_module()
 class TrackNMSFreeCoder(BaseBBoxCoder):
     """Bbox coder for NMS-free detector. Including the fields for tracking
     Args:

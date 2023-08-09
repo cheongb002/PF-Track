@@ -1,9 +1,7 @@
 # ------------------------------------------------------------------------
 # Copyright (c) 2023 toyota research instutute.
 # ------------------------------------------------------------------------
-from projects.tracking_plugin.core.instances import Instances
 import torch
-import numpy as np
 
 
 class RunTimeTracker:
@@ -47,6 +45,8 @@ class RunTimeTracker:
     def get_active_mask(self, track_instances, training=True):
         if training:
             active_mask = (track_instances.matched_gt_idxes >= 0)
+        else:
+            raise NotImplementedError
         return active_mask
     
     def empty(self):

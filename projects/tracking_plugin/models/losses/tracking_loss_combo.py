@@ -12,17 +12,15 @@
 # ------------------------------------------------------------------------
 
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from mmcv.runner import force_fp32
-from mmdet.models import LOSSES
-from mmdet.models import build_loss
-from mmdet.core import (build_assigner, reduce_mean, multi_apply, build_sampler)
-from projects.mmdet3d_plugin.core.bbox.util import normalize_bbox
+from mmdet3d.registry import MODELS
+from mmdet.utils.dist_utils import reduce_mean
+
+from projects.PETR.petr.utils import normalize_bbox
+
 from .tracking_loss import TrackingLoss
 
 
-@LOSSES.register_module()
+@MODELS.register_module()
 class TrackingLossCombo(TrackingLoss):
     """ Tracking loss with reference point supervision
     """
@@ -50,8 +48,8 @@ class TrackingLossCombo(TrackingLoss):
         super(TrackingLoss, self).__init__(
             num_classes, code_weights, sync_cls_avg_factor, interm_loss,
             loss_cls, loss_bbox, loss_iou, assigner)
-        self.loss_traj = build_loss(loss_prediction)
-        self.loss_mem_cls = build_loss(loss_cls)
+        self.loss_traj = MODELS.build(loss_prediction)
+        self.loss_mem_cls = MODELS.build(loss_cls)
         # self.loc_refine_code_weights = [1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         self.loc_refine_code_weights = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.2, 0.2]
     
@@ -136,7 +134,6 @@ class TrackingLossCombo(TrackingLoss):
         loss_dict[f'f{frame_idx}.loss_mem_bbox'] = loss_bbox
         return loss_dict
 
-    @force_fp32(apply_to=('preds_dicts'))
     def forward(self,
                 preds_dicts):
         """Loss function for multi-frame tracking
