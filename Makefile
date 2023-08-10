@@ -35,8 +35,6 @@ DOCKER_BUILD_ARGS = \
 
 docker-build:
 	docker image build \
-	--runtime=nvidia \
-	--gpus all \
 	-f $(DOCKER_FILE) \
 	-t $(DOCKER_IMAGE) \
 	$(DOCKER_BUILD_ARGS) .

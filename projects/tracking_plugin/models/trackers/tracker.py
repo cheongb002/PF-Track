@@ -449,6 +449,7 @@ class Cam3DTracker(PETR):
             if prev_active_track_instances is None:
                 track_instances = self.generate_empty_instance()
             else:
+                device = prev_active_track_instances.reference_points.device
                 if self.motion_prediction:
                     time_delta = self.runtime_tracker.time_delta
                     prev_active_track_instances = self.update_reference_points(
@@ -456,8 +457,8 @@ class Cam3DTracker(PETR):
                         use_prediction=self.motion_prediction_ref_update, tracking=True)
                 if self.if_update_ego:
                     prev_active_track_instances = self.update_ego(
-                        prev_active_track_instances, self.runtime_tracker.l2g, 
-                        img_metas_single_frame[0]['lidar2global'])
+                        prev_active_track_instances, self.runtime_tracker.l2g.to(device), 
+                        img_metas_single_frame[0]['lidar2global'].to(device))
                 prev_active_track_instances = self.STReasoner.sync_pos_embedding(prev_active_track_instances, self.query_embedding)
                 track_instances = Instances.cat([self.generate_empty_instance(), prev_active_track_instances])
 

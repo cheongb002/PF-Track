@@ -1,9 +1,10 @@
 from os import path as osp
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Sequence
 
 import mmengine
 import numpy as np
 import pyquaternion
+import torch
 from mmdet3d.evaluation.metrics import NuScenesMetric
 from mmdet3d.registry import METRICS
 from mmdet3d.structures import LiDARInstance3DBoxes
@@ -73,6 +74,32 @@ class NuScenesTrackingMetric(NuScenesMetric):
             **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.eval_tracking_configs = track_configs(eval_version)
+
+    def process(self, data_batch: dict, data_samples: Sequence[dict]) -> None:
+        """Process one batch of data samples and predictions.
+
+        The processed results should be stored in ``self.results``, which will
+        be used to compute the metrics when all batches have been processed.
+
+        Args:
+            data_batch (dict): A batch of data from the dataloader.
+            data_samples (Sequence[dict]): A batch of outputs from the model.
+        """
+        for data_sample in data_samples:
+            result = dict()
+            pred_3d = data_sample['pred_instances_3d']
+            pred_2d = data_sample['pred_instances']
+            for attr_name in pred_3d:
+                # check if the attribute is a tensor
+                if isinstance(pred_3d[attr_name], torch.Tensor):
+                    pred_3d[attr_name] = pred_3d[attr_name].to('cpu')
+            result['pred_instances_3d'] = pred_3d
+            for attr_name in pred_2d:
+                pred_2d[attr_name] = pred_2d[attr_name].to('cpu')
+            result['pred_instances'] = pred_2d
+            sample_idx = data_sample['sample_idx']
+            result['sample_idx'] = sample_idx
+            self.results.append(result)
 
     def _format_lidar_bbox(self,
                            results: List[dict],
@@ -154,7 +181,6 @@ class NuScenesTrackingMetric(NuScenesMetric):
         Returns:
             Dict[str, float]: Dictionary of evaluation details.
         """
-        from nuscenes import NuScenes
         from nuscenes.eval.tracking.evaluate import TrackingEval
 
         output_dir = osp.join(*osp.split(result_path)[:-1])
@@ -201,7 +227,7 @@ def output_to_nusc_box(detection):
     Returns:
         list[:obj:`NuScenesBox`]: List of standard NuScenesBoxes.
     """
-    box3d = detection['boxes_3d']
+    box3d = detection['bboxes_3d']
     scores = detection['scores_3d'].numpy()
     if 'track_scores' in detection.keys() and detection['track_scores'] is not None:
         scores = detection['track_scores'].numpy()
@@ -273,8 +299,10 @@ def lidar_nusc_box_to_global(info,
     box_list = []
     for box in boxes:
         # Move box to ego vehicle coord system
-        box.rotate(pyquaternion.Quaternion(info['lidar2ego_rotation']))
-        box.translate(np.array(info['lidar2ego_translation']))
+        lidar2ego = np.array(info['lidar_points']['lidar2ego'])
+        box.rotate(
+            pyquaternion.Quaternion(matrix=lidar2ego, rtol=1e-05, atol=1e-07))
+        box.translate(lidar2ego[:3, 3])
         # filter det in ego.
         cls_range_map = eval_configs.class_range
         radius = np.linalg.norm(box.center[:2], 2)
@@ -285,7 +313,9 @@ def lidar_nusc_box_to_global(info,
         if radius > det_range:
             continue
         # Move box to global coord system
-        box.rotate(pyquaternion.Quaternion(info['ego2global_rotation']))
-        box.translate(np.array(info['ego2global_translation']))
+        ego2global = np.array(info['ego2global'])
+        box.rotate(
+            pyquaternion.Quaternion(matrix=ego2global, rtol=1e-05, atol=1e-07))
+        box.translate(ego2global[:3, 3])
         box_list.append(box)
     return box_list

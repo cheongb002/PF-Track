@@ -66,6 +66,7 @@ model = dict(
     motion_prediction_ref_update=True,
     runtime_tracker=dict(
         output_threshold=0.2,
+        score_threshold=0.2,
         record_threshold=0.4,
         max_age_since_update=7,
     ),
