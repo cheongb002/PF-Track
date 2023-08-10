@@ -181,7 +181,6 @@ class NuScenesTrackingMetric(NuScenesMetric):
         Returns:
             Dict[str, float]: Dictionary of evaluation details.
         """
-        from nuscenes import NuScenes
         from nuscenes.eval.tracking.evaluate import TrackingEval
 
         output_dir = osp.join(*osp.split(result_path)[:-1])

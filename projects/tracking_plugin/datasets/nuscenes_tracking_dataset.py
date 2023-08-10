@@ -43,7 +43,7 @@ class NuScenesTrackingDataset(NuScenesDataset):
         else:
             return super().__len__()
 
-    def prepare_data(self, index: int) -> dict | None:
+    def prepare_data(self, index: int) -> Union[dict, None]:
         input_dict = super().prepare_data(index)
         if input_dict is None:
             return None
