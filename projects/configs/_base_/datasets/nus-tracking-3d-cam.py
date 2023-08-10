@@ -229,7 +229,7 @@ val_dataloader = dict(
         backend_args=backend_args))
 
 val_evaluator = dict(
-    type='NuScenesMetric',
+    type='NuScenesTrackingMetric',
     data_root=data_root,
     ann_file=data_root + val_pkl_path,
     metric='bbox',

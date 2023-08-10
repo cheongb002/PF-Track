@@ -211,7 +211,7 @@ class SpatialTemporalReasoner(nn.Module):
             track_instances.query_embeds = mlp_embed(pos2posemb3d(track_instances.reference_points))
             track_instances.hist_position_embeds = mlp_embed(pos2posemb3d(track_instances.hist_xyz))
         return track_instances
-    
+
     def update_ego(self, track_instances: Instances, l2g0, l2g1):
         """Update the ego coordinates for reference points, hist_xyz, and fut_xyz of the track_instances
            Modify the centers of the bboxes at the same time
@@ -229,7 +229,7 @@ class SpatialTemporalReasoner(nn.Module):
                                                      src_normalized=True, tgt_normalized=False)
         track_instances.bboxes[..., [0, 1, 4]] = physical_ref_points.clone()
         track_instances.reference_points = normalize(physical_ref_points, self.pc_range)
-        
+
         """2. History states"""
         inst_num = len(track_instances)
         hist_ref_xyz = track_instances.hist_xyz.clone().view(inst_num * self.hist_len, 3)
