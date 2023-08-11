@@ -17,6 +17,7 @@ from mmdet3d.registry import MODELS
 from mmdet.models.task_modules import build_assigner, build_sampler
 from mmdet.models.utils.misc import multi_apply
 from mmdet.utils.dist_utils import reduce_mean
+from mmengine.structures import InstanceData
 
 from projects.PETR.petr.utils import normalize_bbox
 
@@ -126,8 +127,10 @@ class TrackingLossBase(nn.Module):
         # assigner and sampler
         assign_result = self.assigner.assign(bbox_pred, cls_score, gt_bboxes,
                                              gt_labels, gt_bboxes_ignore)
-        sampling_result = self.sampler.sample(assign_result, bbox_pred,
-                                              gt_bboxes)
+        pred_instance_3d = InstanceData(priors=bbox_pred)
+        gt_instances_3d = InstanceData(bboxes_3d=gt_bboxes)
+        sampling_result = self.sampler.sample(assign_result, pred_instance_3d,
+                                              gt_instances_3d)
         pos_inds = sampling_result.pos_inds
         neg_inds = sampling_result.neg_inds
 
@@ -137,7 +140,7 @@ class TrackingLossBase(nn.Module):
                                     dtype=torch.long)
         label_instance_ids = gt_bboxes.new_full((num_bboxes,), -1, dtype=torch.long)
         gt_match_idxes = gt_bboxes.new_full((num_bboxes,), -1, dtype=torch.long)
-        labels[pos_inds] = gt_labels[sampling_result.pos_assigned_gt_inds].long()
+        labels[pos_inds] = gt_labels[sampling_result.pos_assigned_gt_inds]
         label_instance_ids[pos_inds] = instance_ids[sampling_result.pos_assigned_gt_inds]
         gt_match_idxes[pos_inds] = sampling_result.pos_assigned_gt_inds.clone()
         label_weights = gt_bboxes.new_ones(num_bboxes)

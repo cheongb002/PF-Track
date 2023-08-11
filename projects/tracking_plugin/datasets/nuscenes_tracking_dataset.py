@@ -8,12 +8,14 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 # ------------------------------------------------------------------------
 
+import copy
 from typing import List, Union
 
 import numpy as np
 from mmdet3d.datasets import NuScenesDataset
 from mmdet3d.registry import DATASETS
 from mmengine.dataset import Compose
+from mmengine.logging import print_log
 
 
 @DATASETS.register_module()
@@ -44,7 +46,7 @@ class NuScenesTrackingDataset(NuScenesDataset):
             return super().__len__()
 
     def prepare_data(self, index: int) -> Union[dict, None]:
-        input_dict = super().prepare_data(index)
+        input_dict = self._prepare_data_single(index)
         if input_dict is None:
             return None
         ann_info = input_dict['ann_info'] if not self.test_mode \
@@ -58,7 +60,7 @@ class NuScenesTrackingDataset(NuScenesDataset):
         index_list = self.generate_track_data_indexes(index)
         index_list = index_list[::-1]
         for i in index_list[1:]:
-            data_info_i = super().prepare_data(i)
+            data_info_i = self._prepare_data_single(i)
             if data_info_i is None or data_info_i['scene_token'] != scene_token:
                 return None
             ann_info = data_info_i['ann_info'] if not self.test_mode \
@@ -72,18 +74,58 @@ class NuScenesTrackingDataset(NuScenesDataset):
         # return to the normal frame order
         data_queue = data_queue[::-1]
 
-        # # construct dict of lists
-        # sample_data = dict()
-        # for key in data_queue[-1].keys():
-        #     sample_data[key] = list()
-        # for d in data_queue:
-        #     for k, v in d.items():
-        #         sample_data[k].append(v)
-
         # multiframe processing
-        # data = self.pipeline_multiframe(sample_data)
         data = self.pipeline_multiframe(data_queue)
         return data
+
+    def _prepare_data_single(self, index: int) -> Union[dict, None]:
+        """Data preparation for both training and testing stage.
+
+        Called by `__getitem__`  of dataset.
+
+        Args:
+            index (int): Index for accessing the target data.
+
+        Returns:
+            dict or None: Data dict of the corresponding index.
+        """
+        ori_input_dict = self.get_data_info(index)
+
+        # deepcopy here to avoid inplace modification in pipeline.
+        input_dict = copy.deepcopy(ori_input_dict)
+
+        # box_type_3d (str): 3D box type.
+        input_dict['box_type_3d'] = self.box_type_3d
+        # box_mode_3d (str): 3D box mode.
+        input_dict['box_mode_3d'] = self.box_mode_3d
+
+        # pre-pipline return None to random another in `__getitem__`
+        if not self.test_mode and self.filter_empty_gt:
+            if len(input_dict['ann_info']['gt_labels_3d']) == 0:
+                return None
+
+        example = self.pipeline(input_dict)
+
+        if not self.test_mode and self.filter_empty_gt:
+            # after pipeline drop the example with empty annotations
+            # return None to random another in `__getitem__`
+            if example is None or len(
+                    example['gt_bboxes_3d']) == 0:
+                return None
+
+        if self.show_ins_var:
+            if 'ann_info' in ori_input_dict:
+                self._show_ins_var(
+                    ori_input_dict['ann_info']['gt_labels_3d'],
+                    example['gt_bboxes_3d'])
+            else:
+                print_log(
+                    "'ann_info' is not in the input dict. It's probably that "
+                    'the data is not in training mode',
+                    'current',
+                    level=30)
+
+        return example
 
     def parse_data_info(self, info: dict) -> Union[List[dict], dict]:
         data_info = super().parse_data_info(info)

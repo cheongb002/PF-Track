@@ -92,7 +92,7 @@ train_pipeline = [
 
 train_pipeline_multiframe = [
     dict(type='TrackResizeCropFlipImage', data_aug_conf = ida_aug_conf, training=True),
-    dict(type='Pack3DTrackInputsTrack', 
+    dict(type='Pack3DTrackInputs', 
          keys=[
             'points', 'gt_bboxes_3d', 'gt_labels_3d', 'instance_inds', 'img', 
             'gt_forecasting_locs', 'gt_forecasting_masks', 'gt_forecasting_types'],
@@ -164,7 +164,7 @@ eval_pipeline = [
 ]
 
 # pkl paths
-train_pkl_path = 'mmlab-v2/tracking_forecasting_infos-mini_infos_val.pkl'
+train_pkl_path = 'mmlab-v2/tracking_forecasting-mini_infos_train.pkl'
 test_pkl_path = 'mmlab-v2/tracking_forecasting-mini_infos_val.pkl'
 val_pkl_path = 'mmlab-v2/tracking_forecasting-mini_infos_val.pkl'
 
