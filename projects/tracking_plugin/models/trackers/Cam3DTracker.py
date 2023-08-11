@@ -174,7 +174,7 @@ class Cam3DTracker(PETR):
         track_instances.fut_scores = torch.zeros(
             (len(track_instances), self.fut_len), dtype=torch.float, device=device)
         return track_instances
-    
+
     def update_ego(self, track_instances, l2g0, l2g1):
         """Update the ego coordinates for reference points, hist_xyz, and fut_xyz of the track_instances
            Modify the centers of the bboxes at the same time
@@ -275,12 +275,7 @@ class Cam3DTracker(PETR):
     def loss(
             self,
             inputs:dict,
-            data_samples,
-            gt_bboxes_3d=None,
-            gt_labels_3d=None,
-            gt_forecasting_locs=None,
-            gt_forecasting_masks=None,
-            instance_inds=None):
+            data_samples):
         """Forward training function.
         Args:
             points (list[torch.Tensor], optional): Points of each sample.
@@ -307,67 +302,67 @@ class Cam3DTracker(PETR):
         """
         img = inputs['imgs']
         batch_size = len(img)
+        assert batch_size == 1, "Currently only support batch size 1"
         num_frame = img[0].shape[0]
 
         # Image features, one clip at a time for checkpoint usages
         img_feats = self.extract_clip_imgs_feats(img=img)
 
-        # transform labels to a temporal frame-first sense
-        # ff_gt_bboxes_list, ff_gt_labels_list, ff_instance_ids = list(), list(), list()
-        # for i in range(num_frame):
-        #     ff_gt_bboxes_list.append([gt_bboxes_3d[j][i] for j in range(batch_size)])
-        #     ff_gt_labels_list.append([gt_labels_3d[j][i] for j in range(batch_size)])
-        #     ff_instance_ids.append([instance_inds[j][i] for j in range(batch_size)])
-        
         # Empty the runtime_tracker
         # Use PETR head to decode the bounding boxes on every frame
         outs = list()
+        # returns only single set of track instances, corresponding to single batch
         next_frame_track_instances = self.generate_empty_instance()
-        # img_metas_keys = img_metas[0].keys()
+        device = next_frame_track_instances.reference_points.device
 
         # Running over all the frames one by one
         self.runtime_tracker.empty()
         for frame_idx in range(num_frame):
-            # img_metas_single_frame = list()
-            # for batch_idx in range(batch_size):
-            #     img_metas_single_sample = {key: img_metas[batch_idx][key][frame_idx] for key in img_metas_keys}
-            #     img_metas_single_frame.append(img_metas_single_sample)
+            # for bs 1, equivalent to [data_samples[0][frame_idx].metainfo]
+            img_metas_single_frame = [ds_batch[frame_idx].metainfo for ds_batch in data_samples]
+            ff_gt_bboxes_list = [ds_batch[frame_idx].gt_instances_3d.bboxes_3d for ds_batch in data_samples]
+            ff_gt_labels_list = [ds_batch[frame_idx].gt_instances_3d.labels_3d for ds_batch in data_samples]
+            ff_instance_inds = [ds_batch[frame_idx].gt_instances_3d.instance_inds for ds_batch in data_samples]
+            gt_forecasting_locs = data_samples[0][frame_idx].gt_instances_3d.forecasting_locs
+            gt_forecasting_masks = data_samples[0][frame_idx].gt_instances_3d.forecasting_masks
 
             # PETR detection head
             track_instances = next_frame_track_instances
-            out = self.pts_bbox_head(img_feats[frame_idx], img_metas_single_frame, 
-                                     track_instances.query_feats, track_instances.query_embeds, 
-                                     track_instances.reference_points)
+            out = self.pts_bbox_head(
+                img_feats[frame_idx], img_metas_single_frame, 
+                track_instances.query_feats, track_instances.query_embeds, 
+                track_instances.reference_points)
 
             # 1. Record the information into the track instances cache
             track_instances = self.load_detection_output_into_cache(track_instances, out)
             out['track_instances'] = track_instances
-            # out['points'] = points[0][frame_idx]
 
             # 2. Loss computation for the detection
             out['loss_dict'] = self.criterion.loss_single_frame(
-                frame_idx, ff_gt_bboxes_list[frame_idx], ff_gt_labels_list[frame_idx],
-                ff_instance_ids[frame_idx], out, None)
+                frame_idx, ff_gt_bboxes_list, ff_gt_labels_list,
+                ff_instance_inds, out, None)
 
             # 3. Spatial-temporal reasoning
             track_instances = self.STReasoner(track_instances)
 
             if self.STReasoner.history_reasoning:
-                out['loss_dict'] = self.criterion.loss_mem_bank(frame_idx,
-                                                                out['loss_dict'],
-                                                                ff_gt_bboxes_list[frame_idx],
-                                                                ff_gt_labels_list[frame_idx],
-                                                                ff_instance_ids[frame_idx],
-                                                                track_instances)
+                out['loss_dict'] = self.criterion.loss_mem_bank(
+                    frame_idx,
+                    out['loss_dict'],
+                    ff_gt_bboxes_list,
+                    ff_gt_labels_list,
+                    ff_instance_inds,
+                    track_instances)
             
             if self.STReasoner.future_reasoning:
                 active_mask = (track_instances.obj_idxes >= 0)
-                out['loss_dict'] = self.forward_loss_prediction(frame_idx,
-                                                                out['loss_dict'],
-                                                                track_instances[active_mask],
-                                                                gt_forecasting_locs[frame_idx],
-                                                                gt_forecasting_masks[frame_idx],
-                                                                ff_instance_ids[frame_idx])
+                out['loss_dict'] = self.forward_loss_prediction(
+                    frame_idx,
+                    out['loss_dict'],
+                    track_instances[active_mask],
+                    gt_forecasting_locs,
+                    gt_forecasting_masks,
+                    ff_instance_inds[frame_idx])
 
             # 4. Prepare for next frame
             track_instances = self.frame_summarization(track_instances, tracking=False)
@@ -375,14 +370,18 @@ class Cam3DTracker(PETR):
             track_instances.track_query_mask[active_mask] = True
             active_track_instances = track_instances[active_mask]
             if self.motion_prediction and frame_idx < num_frame - 1:
-                time_delta = timestamps[frame_idx + 1] - timestamps[frame_idx]
-                active_track_instances = self.update_reference_points(active_track_instances,
-                                                                      time_delta,
-                                                                      use_prediction=self.motion_prediction_ref_update,
-                                                                      tracking=False)
+                time_delta = data_samples[0][frame_idx+1].metainfo['timestamp'] - data_samples[0][frame_idx].metainfo['timestamp']
+                active_track_instances = self.update_reference_points(
+                    active_track_instances,
+                    time_delta,
+                    use_prediction=self.motion_prediction_ref_update,
+                    tracking=False)
             if self.if_update_ego and frame_idx < num_frame - 1:
                 active_track_instances = self.update_ego(
-                    active_track_instances, lidar2global[frame_idx], lidar2global[frame_idx + 1])
+                    active_track_instances, 
+                    img_metas_single_frame[frame_idx]['lidar2global'].to(device), 
+                    img_metas_single_frame[frame_idx + 1]['lidar2global'].to(device),
+                )
             if frame_idx < num_frame - 1:
                 active_track_instances = self.STReasoner.sync_pos_embedding(active_track_instances, self.query_embedding)
             
@@ -407,23 +406,6 @@ class Cam3DTracker(PETR):
 
         # backbone images
         img_feats = self.extract_clip_imgs_feats(img=imgs)
-        # breakpoint()
-        # image metas
-        # all_img_metas = list()
-        # img_metas_keys = batch_img_metas[0].keys()
-        # for i in range(batch_size):
-        #     img_metas_single_sample = dict()
-        #     for key in img_metas_keys:
-        #         # join the fields of every timestamp
-        #         if type(batch_img_metas[i][key][0]) == list:
-        #             contents = deepcopy(batch_img_metas[i][key][0])
-        #             for j in range(1, num_frame):
-        #                 contents += batch_img_metas[i][key][j]
-        #         # pick the representative one
-        #         else:
-        #             contents = deepcopy(batch_img_metas[i][key][0])
-        #     img_metas_single_sample[key] = contents
-        #     all_img_metas.append(img_metas_single_sample)
         
         # new sequence
         timestamp = data_samples[0][0].metainfo['timestamp']
@@ -442,9 +424,7 @@ class Cam3DTracker(PETR):
         prev_active_track_instances = self.runtime_tracker.track_instances
         for frame_idx in range(num_frame): # TODO remove this for loop, assume num_frame = 1 for prediction
             img_metas_single_frame = [ds[frame_idx].metainfo for ds in data_samples]
-            # for batch_idx in range(batch_size):
-            #     img_metas_single_sample = {key: batch_img_metas[batch_idx][key][frame_idx] for key in img_metas_keys}
-            #     img_metas_single_frame.append(img_metas_single_sample)            
+        
             # 1. Update the information of previous active tracks
             if prev_active_track_instances is None:
                 track_instances = self.generate_empty_instance()
