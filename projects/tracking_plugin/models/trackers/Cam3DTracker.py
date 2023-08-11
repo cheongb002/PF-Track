@@ -362,7 +362,7 @@ class Cam3DTracker(PETR):
                     track_instances[active_mask],
                     gt_forecasting_locs,
                     gt_forecasting_masks,
-                    ff_instance_inds[frame_idx])
+                    ff_instance_inds)
 
             # 4. Prepare for next frame
             track_instances = self.frame_summarization(track_instances, tracking=False)
@@ -397,7 +397,6 @@ class Cam3DTracker(PETR):
             self,
             inputs:dict,
             data_samples):
-        # breakpoint()
         imgs = inputs['imgs'] # bs, num frames, num cameras (6), C, H, W
         batch_size = len(imgs)
         assert batch_size == 1, "Only support single bs prediction"
@@ -449,7 +448,6 @@ class Cam3DTracker(PETR):
             out = self.pts_bbox_head(
                 img_feats[frame_idx], img_metas_single_frame, track_instances.query_feats,
                 track_instances.query_embeds, track_instances.reference_points)
-            # breakpoint()
             # 3. Record the information into the track instances cache
             track_instances = self.load_detection_output_into_cache(track_instances, out)
             out['track_instances'] = track_instances
