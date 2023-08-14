@@ -301,12 +301,12 @@ class Cam3DTracker(PETR):
             dict: Losses of different branches.
         """
         img = inputs['imgs']
-        batch_size = len(img)
+        num_frame = len(img)
+        batch_size = img[0].shape[0]
         assert batch_size == 1, "Currently only support batch size 1"
-        num_frame = img[0].shape[0]
 
         # Image features, one clip at a time for checkpoint usages
-        img_feats = self.extract_clip_imgs_feats(img=img)
+        img_feats = self.extract_clip_imgs_feats(img=img) # output gets put into frame first
 
         # Empty the runtime_tracker
         # Use PETR head to decode the bounding boxes on every frame
@@ -317,14 +317,13 @@ class Cam3DTracker(PETR):
 
         # Running over all the frames one by one
         self.runtime_tracker.empty()
-        for frame_idx in range(num_frame):
-            # for bs 1, equivalent to [data_samples[0][frame_idx].metainfo]
-            img_metas_single_frame = [ds_batch[frame_idx].metainfo for ds_batch in data_samples]
-            ff_gt_bboxes_list = [ds_batch[frame_idx].gt_instances_3d.bboxes_3d for ds_batch in data_samples]
-            ff_gt_labels_list = [ds_batch[frame_idx].gt_instances_3d.labels_3d for ds_batch in data_samples]
-            ff_instance_inds = [ds_batch[frame_idx].gt_instances_3d.instance_inds for ds_batch in data_samples]
-            gt_forecasting_locs = data_samples[0][frame_idx].gt_instances_3d.forecasting_locs
-            gt_forecasting_masks = data_samples[0][frame_idx].gt_instances_3d.forecasting_masks
+        for frame_idx, data_samples_frame in enumerate(data_samples):
+            img_metas_single_frame = [ds_batch.metainfo for ds_batch in data_samples_frame]
+            ff_gt_bboxes_list = [ds_batch.gt_instances_3d.bboxes_3d for ds_batch in data_samples_frame]
+            ff_gt_labels_list = [ds_batch.gt_instances_3d.labels_3d for ds_batch in data_samples_frame]
+            ff_instance_inds = [ds_batch.gt_instances_3d.instance_inds for ds_batch in data_samples_frame]
+            gt_forecasting_locs = data_samples_frame[0].gt_instances_3d.forecasting_locs
+            gt_forecasting_masks = data_samples_frame[0].gt_instances_3d.forecasting_masks
 
             # PETR detection head
             track_instances = next_frame_track_instances
@@ -370,7 +369,8 @@ class Cam3DTracker(PETR):
             track_instances.track_query_mask[active_mask] = True
             active_track_instances = track_instances[active_mask]
             if self.motion_prediction and frame_idx < num_frame - 1:
-                time_delta = data_samples[0][frame_idx+1].metainfo['timestamp'] - data_samples[0][frame_idx].metainfo['timestamp']
+                # assume batch size is 1
+                time_delta = data_samples[frame_idx+1][0].metainfo['timestamp'] - data_samples[frame_idx][0].metainfo['timestamp']
                 active_track_instances = self.update_reference_points(
                     active_track_instances,
                     time_delta,
@@ -379,8 +379,8 @@ class Cam3DTracker(PETR):
             if self.if_update_ego and frame_idx < num_frame - 1:
                 active_track_instances = self.update_ego(
                     active_track_instances, 
-                    img_metas_single_frame[frame_idx]['lidar2global'].to(device), 
-                    img_metas_single_frame[frame_idx + 1]['lidar2global'].to(device),
+                    data_samples[frame_idx][0].metainfo['lidar2global'].to(device), 
+                    data_samples[frame_idx + 1][0].metainfo['lidar2global'].to(device),
                 )
             if frame_idx < num_frame - 1:
                 active_track_instances = self.STReasoner.sync_pos_embedding(active_track_instances, self.query_embedding)
@@ -520,36 +520,16 @@ class Cam3DTracker(PETR):
         Return:
            img_feats (list[torch.Tensor]): List of features on every frame.
         """
-        batch_size = len(img)
-        num_frame, num_cam = img[0].shape[0], img[0].shape[1]
+        num_frame = len(img)
+        batch_size, num_cam = img[0].shape[0], img[0].shape[1]
 
         # backbone images
         # get all the images and let backbone infer for once
-        # all_imgs, all_img_metas = list(), list()
-        all_imgs = list()
+        # all_imgs = list()
         dummy_img_metas = [dict() for _ in range(batch_size)] # metas not actually required to extract features
-        for frame_idx in range(num_frame):
-            # single frame image, N * NumCam * C * H * W
-            img_single_frame = torch.stack([p[frame_idx] for p in img], dim=0)
-            all_imgs.append(img_single_frame)
-        # image metas
-        # img_metas_keys = img_metas[0].keys()
-        # for i in range(batch_size):
-        #     img_metas_single_sample = dict()
-        #     for key in img_metas_keys:
-        #         # join the fields of every timestamp
-        #         if type(img_metas[i][key][0]) == list:
-        #             contents = deepcopy(img_metas[i][key][0])
-        #             for j in range(1, num_frame):
-        #                 contents += img_metas[i][key][j]
-        #         # pick the representative one
-        #         else:
-        #             contents = deepcopy(img_metas[i][key][0])
-        #     img_metas_single_sample[key] = contents
-        #     all_img_metas.append(img_metas_single_sample)
 
-        # all imgs N * (T * NumCam) * C * H * W
-        all_imgs = torch.cat(all_imgs, dim=1)
+        # all imgs B * (T * NumCam) * C * H * W, T is frame num
+        all_imgs = torch.cat([frame for frame in img], dim=1)
         # img_feats List[Tensor of batch 0, ...], each tensor BS * (T * NumCam) * C * H * W
         all_img_feats = self.extract_feat(img=all_imgs, img_metas=dummy_img_metas)
 
