@@ -24,13 +24,14 @@ class TrackLoadAnnotations3D(LoadAnnotations3D):
     def _load_forecasting(self, results):
         """Private function to load forecasting annotations
         """
-        results['gt_forecasting_locs'] = results['ann_info']['gt_forecasting_locs']
-        results['gt_forecasting_masks'] = results['ann_info']['gt_forecasting_masks']
-        results['gt_forecasting_types'] = results['ann_info']['gt_forecasting_types']
+        results['gt_forecasting_locs'] = results['ann_info']['forecasting_locs']
+        results['gt_forecasting_masks'] = results['ann_info']['forecasting_masks']
+        results['gt_forecasting_types'] = results['ann_info']['forecasting_types']
         return results
 
     def transform(self, results: dict) -> dict:
         results = super().transform(results)
+        results = self._load_track_ids(results)
         if self.with_forecasting:
             results = self._load_forecasting(results)
         return results
