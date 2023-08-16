@@ -344,8 +344,6 @@ class Fusion3DTracker(Cam3DTracker):
         x = self.pts_backbone(x)
         x = self.pts_neck(x)
 
-        # add an extra dimension to simulate num_cameras=1 for PETR-based head compatibility
-        x = x.unsqueeze(1)
         return x
 
     def extract_img_feat(
