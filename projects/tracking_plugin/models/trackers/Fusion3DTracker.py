@@ -16,7 +16,19 @@ from .Cam3DTracker import Cam3DTracker, track_bbox3d2result
 
 @MODELS.register_module()
 class Fusion3DTracker(Cam3DTracker):
-    def __init__(self, *args, view_transform:dict, voxelize_cfg:dict, batch_clip:bool=True, **kwargs):
+    def __init__(
+            self, 
+            *args, 
+            view_transform:dict, 
+            voxelize_cfg:dict, 
+            pts_voxel_encoder:dict,
+            pts_middle_encoder:dict,
+            pts_backbone:dict,
+            pts_neck:dict,
+            fusion_layer:dict,
+            batch_clip:bool=True, 
+            **kwargs
+        ):
         """Fusion3DTracker.
         Args:
             batch_clip (bool, optional): Whether to put frames from clip into a single
@@ -332,6 +344,8 @@ class Fusion3DTracker(Cam3DTracker):
         x = self.pts_backbone(x)
         x = self.pts_neck(x)
 
+        # add an extra dimension to simulate num_cameras=1 for PETR-based head compatibility
+        x = x.unsqueeze(1)
         return x
 
     def extract_img_feat(

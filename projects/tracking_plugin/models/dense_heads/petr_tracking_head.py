@@ -98,18 +98,15 @@ class PETRCamTrackingHead(PETRHead):
             pos_embed = coords_position_embeding
             if self.with_multiview:
                 sin_embed = self.positional_encoding(masks)
-                sin_embed = self.adapt_pos3d(sin_embed.flatten(0, 1)).view(
-                    x.size())
-                pos_embed = pos_embed + sin_embed
             else:
                 pos_embeds = []
                 for i in range(num_cams):
                     xy_embed = self.positional_encoding(masks[:, i, :, :])
                     pos_embeds.append(xy_embed.unsqueeze(1))
                 sin_embed = torch.cat(pos_embeds, 1)
-                sin_embed = self.adapt_pos3d(sin_embed.flatten(0, 1)).view(
-                    x.size())
-                pos_embed = pos_embed + sin_embed
+            sin_embed = self.adapt_pos3d(sin_embed.flatten(0, 1)).view(
+                x.size())
+            pos_embed = pos_embed + sin_embed
         else:
             if self.with_multiview:
                 pos_embed = self.positional_encoding(masks)
@@ -123,7 +120,7 @@ class PETRCamTrackingHead(PETRHead):
                 pos_embed = torch.cat(pos_embeds, 1)
 
         # outs_dec [num_dec, bs, num_query, embed_dim]
-        if proj_feature is not None:
+        if proj_feature is not None: # depreciated, never called in Tracker level since proj_feature not passed
             outs_dec, _ = self.transformer(query_targets, x, masks, query_embeds, pos_embed, 
                                            self.reg_branches, proj_feature, proj_pos)
         else:
