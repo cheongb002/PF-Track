@@ -215,7 +215,9 @@ class PETRHead(AnchorFreeHead):
         # if self.with_multiview or not self.with_position:
         #     self.positional_encoding = build_positional_encoding(
         #         positional_encoding)
-        self.positional_encoding = TASK_UTILS.build(positional_encoding)
+        # self.positional_encoding = TASK_UTILS.build(positional_encoding)
+        self.positional_encoding = MODELS.build(positional_encoding)
+
         self.transformer = MODELS.build(transformer)
         self.code_weights = nn.Parameter(
             torch.tensor(self.code_weights, requires_grad=False),

@@ -7,6 +7,7 @@ import numpy as np
 import torch
 from mmdet3d.registry import MODELS
 from mmengine.structures import InstanceData
+from torch.nn import functional as F
 
 from projects.BEVFusion.bevfusion.ops import Voxelization
 from projects.tracking_plugin.core.instances import Instances
@@ -21,12 +22,13 @@ class Fusion3DTracker(Cam3DTracker):
             *args, 
             view_transform:dict, 
             voxelize_cfg:dict, 
+            voxelize_reduce:bool,
             pts_voxel_encoder:dict,
             pts_middle_encoder:dict,
             pts_backbone:dict,
             pts_neck:dict,
             fusion_layer:dict,
-            batch_clip:bool=True, 
+            batch_clip:bool=True,
             **kwargs
         ):
         """Fusion3DTracker.
@@ -38,6 +40,16 @@ class Fusion3DTracker(Cam3DTracker):
         self.batch_clip = batch_clip
         self.view_transform = MODELS.build(view_transform)
         self.pts_voxel_layer = Voxelization(**voxelize_cfg)
+        self.voxelize_reduce = voxelize_reduce
+
+        self.pts_voxel_encoder = MODELS.build(pts_voxel_encoder)
+        self.pts_middle_encoder = MODELS.build(pts_middle_encoder)
+        self.pts_backbone = MODELS.build(pts_backbone)
+        self.pts_neck = MODELS.build(pts_neck)
+        self.fusion_layer = MODELS.build(fusion_layer) if fusion_layer is not None else None
+
+    def init_weights(self) -> None:
+        self.img_backbone.init_weights()
 
     def loss(
             self,
@@ -290,7 +302,7 @@ class Fusion3DTracker(Cam3DTracker):
                 pts_stacked.extend(pts_i)
                 input_metas.extend([ds_batch.metainfo for ds_batch in data_sample_i])
             # extract features from superbatch
-            input_dict = dict(img=imgs_stacked, pts=pts_stacked)
+            input_dict = dict(imgs=imgs_stacked, points=pts_stacked)
             fused_feats = self.extract_feat(input_dict, input_metas)
             # extract output from superbatch back to clip
             for frame_idx in range(num_frames):
@@ -298,7 +310,7 @@ class Fusion3DTracker(Cam3DTracker):
         else:
             # process each frame in clip separately
             for frame_idx, (img_frame, pts_frame) in enumerate(zip(img_clip, pts_clip)):
-                input_dict = dict(img=img_frame, pts=pts_frame)
+                input_dict = dict(imgs=img_frame, points=pts_frame)
                 # iterate over each item in batch for given frame_idx
                 input_metas = [item[frame_idx].metainfo for item in data_samples]
                 fused_feats = self.extract_feat(input_dict, input_metas)
@@ -317,7 +329,10 @@ class Fusion3DTracker(Cam3DTracker):
                 lidar2image.append(meta['lidar2img'])
                 camera_intrinsics.append(meta['cam2img'])
                 camera2lidar.append(meta['cam2lidar'])
-                img_aug_matrix.append(meta.get('img_aug_matrix', np.eye(4)))
+                num_cams = len(meta['cam2img'])
+                img_aug_matrix.append(
+                    meta.get('img_aug_matrix', 
+                             np.vstack([np.eye(4)]*num_cams).reshape(num_cams, 4, 4)))
                 lidar_aug_matrix.append(
                     meta.get('lidar_aug_matrix', np.eye(4)))
 
@@ -336,14 +351,13 @@ class Fusion3DTracker(Cam3DTracker):
         features.append(pts_feature)
 
         if self.fusion_layer is not None:
-            x = self.pts_fusion_layer(features)
+            x = self.fusion_layer(features)
         else:
             assert len(features) == 1, features
             x = features[0]
 
         x = self.pts_backbone(x)
         x = self.pts_neck(x)
-
         return x
 
     def extract_img_feat(

@@ -13,8 +13,8 @@ model = dict(
         max_num_points=10,
         point_cloud_range=[-54.0, -54.0, -5.0, 54.0, 54.0, 3.0],
         voxel_size=[0.075, 0.075, 0.2],
-        max_voxels=[120000, 160000],
-        voxelize_reduce=True),
+        max_voxels=[120000, 160000]),
+    voxelize_reduce=True,
     tracking=False,
     train_backbone=True,
     use_grid_mask=True,
@@ -184,9 +184,9 @@ model = dict(
     fusion_layer=dict(
         type='ConvFuser', in_channels=[80, 256], out_channels=256),
     pts_bbox_head=dict(
-        type='PETRCamTrackingHead',
+        type='BEVFusionTrackingHead',
         num_classes=10,
-        in_channels=256,
+        in_channels=512,
         LID=True,
         with_position=True,
         with_multiview=True,
@@ -197,7 +197,7 @@ model = dict(
             decoder=dict(
                 type='PETRTransformerDecoder',
                 return_intermediate=True,
-                num_layers=6,
+                num_layers=1,
                 transformerlayers=dict(
                     type='PETRTransformerDecoderLayer',
                     with_cp=False,
@@ -227,7 +227,8 @@ model = dict(
             score_threshold=0.0,
             num_classes=10), 
         positional_encoding=dict(
-            type='LearnedPositionalEncoding', num_feats=256, normalize=True),
+            # type='mmdet.LearnedPositionalEncoding', num_feats=128, normalize=True),
+            type='mmdet.SinePositionalEncoding', num_feats=128, normalize=True),
         loss_cls=dict(
             type='mmdet.FocalLoss',
             use_sigmoid=True,

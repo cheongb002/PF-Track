@@ -37,22 +37,17 @@ class BEVFusionTrackingHead(PETRCamTrackingHead):
                 head with normalized coordinate format (cx, cy, w, l, cz, h, theta, vx, vy). \
                 Shape [nb_dec, bs, num_query, 9].
         """
-        
         x = mlvl_feats[0]
         batch_size = x.size(0)
-        input_img_h, input_img_w = img_metas[0]['pad_shape']
-        masks = x.new_ones((batch_size, input_img_h, input_img_w))
-        for img_id in range(batch_size):
-            img_h, img_w = img_metas[img_id]['batch_input_shape']
-            masks[img_id, :img_h, :img_w] = 0
-        x = self.input_proj(x.flatten(0, 1))
+        bev_h, bev_w = x.size(2), x.size(3)
+        x = self.input_proj(x)
+        masks = x.new_ones((batch_size, bev_h, bev_w)).to(torch.bool)
         x = x.view(batch_size, 1, *x.shape[-3:]) # add a dimension to simulate num_cams for transformer compatibility
-        # interpolate masks to have the same spatial shape with x
-        masks = F.interpolate(masks, size=x.shape[-2:]).to(torch.bool)
 
         # Key difference with PETR tracking head is the position embedding.
         # Because we work with BEV features, we don't need the extra 2D to 3D stuff in PETR.
         pos_embed = self.positional_encoding(masks)
+        pos_embed.unsqueeze_(1) # add a dimension to simulate num_cams for transformer compatibility
 
         # outs_dec [num_dec, bs, num_query, embed_dim]
         if proj_feature is not None: # depreciated, never called in Tracker level since proj_feature not passed
