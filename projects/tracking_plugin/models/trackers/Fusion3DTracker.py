@@ -2,6 +2,7 @@
 # Copyright (c) 2023 toyota research instutute.
 # ------------------------------------------------------------------------
 from copy import deepcopy
+from typing import Optional
 
 import numpy as np
 import torch
@@ -20,14 +21,14 @@ class Fusion3DTracker(Cam3DTracker):
     def __init__(
             self, 
             *args, 
-            view_transform:dict, 
             voxelize_cfg:dict, 
             voxelize_reduce:bool,
             pts_voxel_encoder:dict,
             pts_middle_encoder:dict,
             pts_backbone:dict,
             pts_neck:dict,
-            fusion_layer:dict,
+            view_transform:Optional[dict]=None,
+            fusion_layer:Optional[dict]=None,
             batch_clip:bool=True,
             **kwargs
         ):
@@ -38,7 +39,6 @@ class Fusion3DTracker(Cam3DTracker):
         """
         super().__init__(*args, **kwargs)
         self.batch_clip = batch_clip
-        self.view_transform = MODELS.build(view_transform)
         self.pts_voxel_layer = Voxelization(**voxelize_cfg)
         self.voxelize_reduce = voxelize_reduce
 
@@ -46,10 +46,12 @@ class Fusion3DTracker(Cam3DTracker):
         self.pts_middle_encoder = MODELS.build(pts_middle_encoder)
         self.pts_backbone = MODELS.build(pts_backbone)
         self.pts_neck = MODELS.build(pts_neck)
+        self.view_transform = MODELS.build(view_transform) if view_transform is not None else None
         self.fusion_layer = MODELS.build(fusion_layer) if fusion_layer is not None else None
 
     def init_weights(self) -> None:
-        self.img_backbone.init_weights()
+        if hasattr(self, 'img_backbone'):
+            self.img_backbone.init_weights()
 
     def loss(
             self,
@@ -79,10 +81,8 @@ class Fusion3DTracker(Cam3DTracker):
         Returns:
             dict: Losses of different branches.
         """
-        img = inputs['imgs']
-        num_frame = len(img)
-        batch_size = img[0].shape[0]
-        assert batch_size == 1, "Currently only support batch size 1"
+        points = inputs['points']
+        num_frame = len(points)
 
         # extract the features of multi-frame images and points
         fused_feats = self.extract_clip_feats(inputs, data_samples)
@@ -173,11 +173,11 @@ class Fusion3DTracker(Cam3DTracker):
         return losses
 
     def predict(self, inputs:dict, data_samples):
-        imgs = inputs['imgs'] # bs, num frames, num cameras (6), C, H, W
-        batch_size = len(imgs)
-        assert batch_size == 1, "Only support single bs prediction"
-        num_frame = imgs[0].shape[0]
+        points = inputs['points']
+        num_frame = len(points)
+        batch_size = len(points[0])
         assert num_frame == 1, "Only support single frame prediction"
+        assert batch_size == 1, "Only support single bs prediction"
 
         # extract the features of multi-frame images and points
         fused_feats = self.extract_clip_feats(inputs, data_samples)
@@ -288,14 +288,17 @@ class Fusion3DTracker(Cam3DTracker):
 
     def extract_clip_feats(self, inputs, data_samples):
         outputs = list()
-        img_clip = inputs['imgs']
         pts_clip = inputs['points']
-        num_frames = len(img_clip)
-        batch_size, num_came = img_clip[0].shape[0:2]
+        num_frames = len(pts_clip)
+        batch_size = len(pts_clip[0])
+        img_clip = inputs.get('imgs', [None]*num_frames)
         if self.batch_clip:
             # put batched frames from clip into a single superbatch
             # single frame image, N * NumCam * C * H * W
-            imgs_stacked = torch.cat([frame for frame in img_clip], dim=0)
+            if img_clip[0] is not None:
+                imgs_stacked = torch.cat([frame for frame in img_clip], dim=0)
+            else:
+                imgs_stacked = None
             pts_stacked = []
             input_metas = []
             for pts_i, data_sample_i in zip(pts_clip, data_samples):
