@@ -155,7 +155,7 @@ eval_pipeline = [
 ]
 
 # pkl paths
-train_pkl_path = 'mmlab-v2/tracking_forecasting-mini_infos_train.pkl'
+train_pkl_path = 'mmlab-v2/tracking_forecasting-mini_infos_val.pkl'
 test_pkl_path = 'mmlab-v2/tracking_forecasting-mini_infos_val.pkl'
 val_pkl_path = 'mmlab-v2/tracking_forecasting-mini_infos_val.pkl'
 
@@ -220,7 +220,8 @@ val_dataloader = dict(
         backend_args=backend_args))
 
 val_evaluator = dict(
-    type='NuScenesTrackingMetric',
+    # type='NuScenesTrackingMetric',
+    type='NuScenesMetric',
     data_root=data_root,
     ann_file=data_root + val_pkl_path,
     metric='bbox',
@@ -228,6 +229,6 @@ val_evaluator = dict(
     backend_args=backend_args)
 test_evaluator = val_evaluator
 
-vis_backends = [dict(type='LocalVisBackend')]
+vis_backends = [dict(type='TensorboardVisBackend')]
 visualizer = dict(
     type='Det3DLocalVisualizer', vis_backends=vis_backends, name='visualizer')

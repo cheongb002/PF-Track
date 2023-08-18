@@ -131,7 +131,7 @@ class Fusion3DTracker(Cam3DTracker):
                     ff_gt_labels_list,
                     ff_instance_inds,
                     track_instances)
-            
+
             if self.STReasoner.future_reasoning:
                 active_mask = (track_instances.obj_idxes >= 0)
                 out['loss_dict'] = self.forward_loss_prediction(

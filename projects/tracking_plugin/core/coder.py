@@ -37,7 +37,7 @@ class TrackNMSFreeCoder(BaseBBoxCoder):
         
         self.pc_range = pc_range
         self.voxel_size = voxel_size
-        self.post_center_range = post_center_range
+        self.post_center_range = torch.tensor(post_center_range)
         self.max_num = max_num
         self.score_threshold = score_threshold
         self.num_classes = num_classes
@@ -100,10 +100,10 @@ class TrackNMSFreeCoder(BaseBBoxCoder):
         final_motion_forecasting = motion_forecasting
 
         # use score threshold
-        if self.score_threshold is not None:
+        if self.score_threshold:
             thresh_mask = final_scores > self.score_threshold
         if self.post_center_range is not None:
-            self.post_center_range = torch.tensor(self.post_center_range, device=scores.device)
+            self.post_center_range = self.post_center_range.to(scores.device)
             
             mask = (final_box_preds[..., :3] >=
                     self.post_center_range[:3]).all(1)
