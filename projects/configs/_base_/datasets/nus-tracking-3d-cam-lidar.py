@@ -128,7 +128,7 @@ test_pipeline_multiframe = [
     dict(type='TrackResizeCropFlipImage', data_aug_conf = ida_aug_conf, training=False),
     dict(
         type='Pack3DTrackInputs',
-        keys=['img'],
+        keys=['img', 'points'],
         meta_keys=[
             'cam2img', 'ori_cam2img', 'lidar2cam', 'lidar2img', 'cam2lidar',
             'ori_lidar2img', 'img_aug_matrix', 'box_type_3d', 'sample_idx',

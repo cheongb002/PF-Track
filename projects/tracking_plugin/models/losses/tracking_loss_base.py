@@ -63,13 +63,8 @@ class TrackingLossBase(nn.Module):
         else:
             self.cls_out_channels = num_classes + 1
         
-        if code_weights is not None:
-            self.code_weights = code_weights
-        else:
-            self.code_weights = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.2, 0.2]
-        
         self.code_weights = nn.parameter.Parameter(torch.tensor(
-            self.code_weights, requires_grad=False), requires_grad=False)
+            code_weights, requires_grad=False), requires_grad=False)
         
         self.bg_cls_weight = 0
         self.sync_cls_avg_factor = sync_cls_avg_factor
@@ -277,7 +272,7 @@ class TrackingLossBase(nn.Module):
         bbox_preds = bbox_preds.reshape(-1, bbox_preds.size(-1))
         normalized_bbox_targets = normalize_bbox(bbox_targets, self.pc_range)
         isnotnan = torch.isfinite(normalized_bbox_targets).all(dim=-1)
-        bbox_weights = bbox_weights * torch.tensor(self.code_weights).to(bbox_preds.device)
+        bbox_weights = bbox_weights * self.code_weights.clone().detach().to(bbox_preds.device)
 
         loss_bbox = self.loss_bbox(
                 bbox_preds[isnotnan, :10], normalized_bbox_targets[isnotnan, :10], bbox_weights[isnotnan, :10], avg_factor=num_total_pos)
