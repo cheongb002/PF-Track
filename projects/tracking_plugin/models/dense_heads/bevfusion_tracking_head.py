@@ -41,7 +41,7 @@ class BEVFusionTrackingHead(PETRCamTrackingHead):
         batch_size = x.size(0)
         bev_h, bev_w = x.size(2), x.size(3)
         x = self.input_proj(x)
-        masks = x.new_ones((batch_size, bev_h, bev_w)).to(torch.bool)
+        masks = x.new_zeros((batch_size, bev_h, bev_w)).to(torch.bool)
         x = x.view(batch_size, 1, *x.shape[-3:]) # add a dimension to simulate num_cams for transformer compatibility
 
         # Key difference with PETR tracking head is the position embedding.
@@ -56,7 +56,6 @@ class BEVFusionTrackingHead(PETRCamTrackingHead):
         else:
             outs_dec, _ = self.transformer(query_targets, x, masks, query_embeds, pos_embed, 
                                            self.reg_branches)
-
         outs_dec = torch.nan_to_num(outs_dec)
         outputs_classes = []
         outputs_coords = []

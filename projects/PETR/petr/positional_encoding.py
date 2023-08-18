@@ -13,7 +13,7 @@ from mmengine.model import BaseModule
 from mmdet3d.registry import MODELS, TASK_UTILS
 
 
-@TASK_UTILS.register_module()
+@MODELS.register_module()
 class SinePositionalEncoding3D(BaseModule):
     """Position encoding with sine and cosine functions. See `End-to-End Object
     Detection with Transformers.

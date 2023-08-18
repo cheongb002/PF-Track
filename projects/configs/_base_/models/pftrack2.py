@@ -192,6 +192,7 @@ model = dict(
         with_multiview=True,
         position_range=[-61.2, -61.2, -10.0, 61.2, 61.2, 10.0],
         normedlinear=False,
+        num_pred=1, # num decoder layers
         transformer=dict(
             type='PETRTrackingTransformer',
             decoder=dict(

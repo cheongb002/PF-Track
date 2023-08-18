@@ -2,7 +2,7 @@ _base_ = [
     '../../_base_/datasets/nus-tracking-3d-cam.py',
     '../../_base_/default_runtime.py',
     '../../_base_/schedules/cosine.py',
-    '../../_base_/models/pftrack2.py'
+    '../../_base_/models/pftrack.py'
 ]
 custom_imports = dict(imports=['projects.BEVFusion.bevfusion'], allow_failed_imports=False)
 custom_imports = dict(imports=['projects.tracking_plugin'], allow_failed_imports=False)

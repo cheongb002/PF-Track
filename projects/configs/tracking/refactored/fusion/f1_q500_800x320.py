@@ -72,3 +72,6 @@ find_unused_parameters=False
 
 # load_from='ckpts/f1/fcos3d_vovnet_imgbackbone-remapped.pth'
 resume_from=None
+default_hooks=dict(
+    logger=dict(interval=1)
+)
