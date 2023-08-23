@@ -14,7 +14,9 @@ class_names = [
     'motorcycle', 'bicycle', 'pedestrian', 
     'construction_vehicle', 'traffic_cone', 'barrier'
 ]
+# metainfo = dict(classes=class_names, version='v1.0-trainval')
 metainfo = dict(classes=class_names, version='v1.0-mini')
+
 dataset_type = 'NuScenesTrackingDataset'
 data_root = './data/nuscenes/'
 # Input modality for nuScenes dataset, this is consistent with the submission
@@ -38,6 +40,14 @@ data_prefix = dict(
 #      }))
 backend_args = None
 
+# pkl paths
+# train_pkl_path = 'mmlab-v2/tracking_forecasting_infos_val.pkl'
+# test_pkl_path = 'mmlab-v2/tracking_forecasting_infos_val.pkl'
+# val_pkl_path = 'mmlab-v2/tracking_forecasting_infos_val.pkl'
+train_pkl_path = 'mmlab-v2/tracking_forecasting-mini_infos_val.pkl'
+test_pkl_path = 'mmlab-v2/tracking_forecasting-mini_infos_val.pkl'
+val_pkl_path = 'mmlab-v2/tracking_forecasting-mini_infos_val.pkl'
+
 train_pipeline = [
     dict(
         type='LoadPointsFromFile',
@@ -57,6 +67,12 @@ train_pipeline = [
          with_bbox_3d=True, 
          with_label_3d=True, 
          with_forecasting=True),
+    # dict(
+    #     type='GlobalRotScaleTrans',
+    #     scale_ratio_range=[0.9, 1.1],
+    #     rot_range=[-0.78539816, 0.78539816],
+    #     translation_std=0.5),
+    # dict(type='BEVFusionRandomFlip3D'),
     dict(type='PointsRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='TrackInstanceRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='TrackObjectNameFilter', classes=class_names),
@@ -125,11 +141,6 @@ eval_pipeline = [
         backend_args=backend_args),
     dict(type='Pack3DDetInputs', keys=['points'])
 ]
-
-# pkl paths
-train_pkl_path = 'mmlab-v2/tracking_forecasting-mini_infos_val.pkl'
-test_pkl_path = 'mmlab-v2/tracking_forecasting-mini_infos_val.pkl'
-val_pkl_path = 'mmlab-v2/tracking_forecasting-mini_infos_val.pkl'
 
 train_dataloader = dict(
     batch_size=1,

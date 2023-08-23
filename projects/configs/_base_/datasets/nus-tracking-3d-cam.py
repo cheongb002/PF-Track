@@ -164,7 +164,7 @@ eval_pipeline = [
 ]
 
 # pkl paths
-train_pkl_path = 'mmlab-v2/tracking_forecasting-mini_infos_train.pkl'
+train_pkl_path = 'mmlab-v2/tracking_forecasting-mini_infos_val.pkl'
 test_pkl_path = 'mmlab-v2/tracking_forecasting-mini_infos_val.pkl'
 val_pkl_path = 'mmlab-v2/tracking_forecasting-mini_infos_val.pkl'
 
@@ -184,6 +184,7 @@ train_dataloader = dict(
         metainfo=metainfo,
         modality=input_modality,
         test_mode=False,
+        use_valid_flag=False,
         data_prefix=data_prefix,
         # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
         # and box_type_3d='Depth' in sunrgbd and scannet dataset.
@@ -229,7 +230,8 @@ val_dataloader = dict(
         backend_args=backend_args))
 
 val_evaluator = dict(
-    type='NuScenesTrackingMetric',
+    # type='NuScenesTrackingMetric',
+    type='NuScenesMetric',
     data_root=data_root,
     ann_file=data_root + val_pkl_path,
     metric='bbox',
@@ -237,6 +239,6 @@ val_evaluator = dict(
     backend_args=backend_args)
 test_evaluator = val_evaluator
 
-vis_backends = [dict(type='LocalVisBackend')]
+vis_backends = [dict(type='TensorboardVisBackend')]
 visualizer = dict(
     type='Det3DLocalVisualizer', vis_backends=vis_backends, name='visualizer')

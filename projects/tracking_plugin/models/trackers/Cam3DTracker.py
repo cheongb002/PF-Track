@@ -555,7 +555,7 @@ class Cam3DTracker(PETR):
             nn.init.zeros_(self.query_feat_embedding.weight)
         
         # freeze backbone
-        if not self.train_backbone:
+        if not self.train_backbone and self.with_img_backbone:
             for param in self.img_backbone.parameters():
                 param.requires_grad = False
         return

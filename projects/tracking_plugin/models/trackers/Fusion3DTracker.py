@@ -23,10 +23,6 @@ class Fusion3DTracker(Cam3DTracker):
             *args, 
             voxelize_cfg:dict, 
             voxelize_reduce:bool,
-            pts_voxel_encoder:dict,
-            pts_middle_encoder:dict,
-            pts_backbone:dict,
-            pts_neck:dict,
             view_transform:Optional[dict]=None,
             fusion_layer:Optional[dict]=None,
             batch_clip:bool=True,
@@ -42,15 +38,31 @@ class Fusion3DTracker(Cam3DTracker):
         self.pts_voxel_layer = Voxelization(**voxelize_cfg)
         self.voxelize_reduce = voxelize_reduce
 
-        self.pts_voxel_encoder = MODELS.build(pts_voxel_encoder)
-        self.pts_middle_encoder = MODELS.build(pts_middle_encoder)
-        self.pts_backbone = MODELS.build(pts_backbone)
-        self.pts_neck = MODELS.build(pts_neck)
-        self.view_transform = MODELS.build(view_transform) if view_transform is not None else None
-        self.fusion_layer = MODELS.build(fusion_layer) if fusion_layer is not None else None
+        if fusion_layer is not None:
+            self.fusion_layer = MODELS.build(fusion_layer)
+            assert view_transform is not None, "view_transform should be provided when fusion_layer is not None"
+            self.view_transform = MODELS.build(view_transform)
+        if not self.train_backbone:
+            for param in self.pts_voxel_encoder.parameters():
+                param.requires_grad = False
+            for param in self.pts_middle_encoder.parameters():
+                param.requires_grad = False
+            for param in self.pts_backbone.parameters():
+                param.requires_grad = False
+            for param in self.pts_neck.parameters():
+                param.requires_grad = False
+            if self.with_img_backbone:
+                for param in self.img_backbone.parameters():
+                    param.requires_grad = False
+            if self.with_img_neck:
+                for param in self.img_neck.parameters():
+                    param.requires_grad = False
+            if self.with_fusion:
+                for param in self.fusion_layer.parameters():
+                    param.requires_grad = False
 
     def init_weights(self) -> None:
-        if hasattr(self, 'img_backbone'):
+        if self.with_img_backbone:
             self.img_backbone.init_weights()
 
     def loss(
@@ -353,7 +365,7 @@ class Fusion3DTracker(Cam3DTracker):
         pts_feature = self.extract_pts_feat(batch_inputs_dict)
         features.append(pts_feature)
 
-        if self.fusion_layer is not None:
+        if self.with_fusion:
             x = self.fusion_layer(features)
         else:
             assert len(features) == 1, features
