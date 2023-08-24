@@ -10,6 +10,7 @@ custom_imports = dict(imports=['projects.tracking_plugin'], allow_failed_imports
 
 point_cloud_range = [-54.0, -54.0, -5.0, 54.0, 54.0, 3.0]
 model = dict(
+    train_backbone=False,
     voxelize_cfg=dict(point_cloud_range=point_cloud_range),
     pc_range = point_cloud_range,
     spatial_temporal_reason=dict(pc_range=point_cloud_range),
@@ -53,11 +54,17 @@ optim_wrapper = dict(
     optimizer=dict(
         type='AdamW', lr=lr, weight_decay=0.01, betas=(0.95, 0.99)),
     clip_grad=dict(max_norm=35, norm_type=2),
-    paramwise_cfg=dict(custom_keys=dict(img_backbone=dict(lr_mult=0.1)))
+    paramwise_cfg=dict(custom_keys=dict(
+        img_backbone=dict(lr_mult=0.1),
+        # pts_voxel_encoder=dict(lr_mult=0.1),
+        # pts_middle_encoder=dict(lr_mult=0.1),
+        # pts_backbone=dict(lr_mult=0.1),
+        # pts_neck=dict(lr_mult=0.1),
+        ))
 )
 
-num_epochs = 2000
-lr = 2e-5
+num_epochs = 200
+lr = 5e-5
 optim_wrapper = dict(
     type='OptimWrapper',
     optimizer=dict(type='AdamW', lr=lr, weight_decay=0.01),
@@ -103,10 +110,10 @@ param_scheduler = [
         by_epoch=True,
         convert_to_iter_based=True)
 ]
-train_cfg = dict(max_epochs=num_epochs, val_interval=10)
+train_cfg = dict(max_epochs=num_epochs, val_interval=5)
 find_unused_parameters=False
 
-# load_from='ckpts/BEVFusion/lidar/bevfusion_lidar_voxel0075_second_secfpn_8xb4-cyclic-20e_nus-3d-2628f933.pth'
+load_from='ckpts/BEVFusion/lidar/epoch_15.pth'
 resume_from=None
 default_hooks=dict(
     logger=dict(interval=80)

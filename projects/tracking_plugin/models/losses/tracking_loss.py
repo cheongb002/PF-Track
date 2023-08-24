@@ -101,7 +101,7 @@ class TrackingLoss(TrackingLossBase):
             unmatched_track_matching_result.append(unmatched_track_dec_matching_result)
             if dec_layer_idx == num_dec_layers - 1:
                 (labels_list, label_instance_ids_list, label_weights_list, bbox_targets_list,
-                    bbox_weights_list, num_total_pos, num_total_neg, gt_match_idxes_list) = unmatched_track_dec_matching_result
+                    bbox_weights_list, matched_ious, num_total_pos, num_total_neg, gt_match_idxes_list) = unmatched_track_dec_matching_result
         
         # step5. update the obj_idxes according to the matching result with the last decoder layer
         track_instances.obj_idxes[unmatched_track_idxes] = label_instance_ids_list[0]
@@ -119,7 +119,7 @@ class TrackingLoss(TrackingLossBase):
 
         for dec_layer_idx in range(num_dec_layers):
             (dec_labels, _, dec_label_weights, dec_bbox_targets,
-                dec_bbox_weights, dec_num_total_pos, dec_num_total_neg, _) = unmatched_track_matching_result[dec_layer_idx]
+                dec_bbox_weights, matched_ious, dec_num_total_pos, dec_num_total_neg, _) = unmatched_track_matching_result[dec_layer_idx]
 
             labels_list = torch.ones_like(track_instances.obj_idxes).long() * self.num_classes
             labels_list[matched_track_idxes] = matched_labels
@@ -147,20 +147,20 @@ class TrackingLoss(TrackingLossBase):
             matched_gt_idxes_list[unmatched_track_idxes] = track_instances.matched_gt_idxes[unmatched_track_idxes]
 
             dec_matching_results = (labels_list, label_weights_list, bbox_targets_list,
-                                    bbox_weights_list, total_pos, total_neg, matched_gt_idxes_list)
+                                    bbox_weights_list, matched_ious, total_pos, total_neg, matched_gt_idxes_list)
             all_matching_list.append(dec_matching_results)
         
         # step 7. compute the single frame losses
         # after getting the matching result, we no longer need contents for gt_bboxes_list etc.
         if self.interm_loss:
-            losses_cls, losses_bbox = multi_apply(
+            losses_cls, losses_bbox, matched_ious = multi_apply(
                self.loss_single_decoder, [frame_idx for _ in range(num_dec_layers)], 
                all_cls_scores, all_bbox_preds,
                [None for _ in range(num_dec_layers)], [None for _ in range(num_dec_layers)], 
                [None for _ in range(num_dec_layers)], [None for _ in range(num_dec_layers)], 
                all_matching_list)
         else:
-            losses_cls, losses_bbox = self.loss_single_decoder(frame_idx,
+            losses_cls, losses_bbox, matched_ious = self.loss_single_decoder(frame_idx,
                 all_cls_scores[-1], all_bbox_preds[-1],
                 None, None, None, None, all_matching_list[-1])
             losses_cls, losses_bbox = [losses_cls], [losses_bbox]
@@ -170,13 +170,16 @@ class TrackingLoss(TrackingLossBase):
         # loss from the last decoder layer
         loss_dict[f'f{frame_idx}.loss_cls'] = losses_cls[-1]
         loss_dict[f'f{frame_idx}.loss_bbox'] = losses_bbox[-1]
+        loss_dict[f'f{frame_idx}.matched_iou'] = matched_ious[-1]
 
         # loss from other decoder layers
         num_dec_layer = 0
-        for loss_cls_i, loss_bbox_i in zip(losses_cls[:-1],
-                                           losses_bbox[:-1]):
+        for loss_cls_i, loss_bbox_i, matched_ious_i in zip(losses_cls[:-1],
+                                                           losses_bbox[:-1],
+                                                           matched_ious[:-1]):
             loss_dict[f'f{frame_idx}.d{num_dec_layer}.loss_cls'] = loss_cls_i
             loss_dict[f'f{frame_idx}.d{num_dec_layer}.loss_bbox'] = loss_bbox_i
+            loss_dict[f'f{frame_idx}.d{num_dec_layer}.matched_iou'] = matched_ious_i
             num_dec_layer += 1
 
         return loss_dict

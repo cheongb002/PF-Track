@@ -11,13 +11,13 @@ from .petr_tracking_head import PETRCamTrackingHead
 @MODELS.register_module()
 class BEVFusionTrackingHead(PETRCamTrackingHead):
     def forward(
-            self, 
-            mlvl_feats, 
-            img_metas:List[Dict[str, Any]], 
-            query_targets, 
-            query_embeds, 
-            reference_points, 
-            proj_feature=None, 
+            self,
+            mlvl_feats,
+            img_metas:List[Dict[str, Any]],
+            query_targets,
+            query_embeds,
+            reference_points,
+            proj_feature=None,
             proj_pos=None):
         """Forward function.
         Args:

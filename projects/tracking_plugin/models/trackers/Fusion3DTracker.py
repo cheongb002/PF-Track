@@ -206,7 +206,7 @@ class Fusion3DTracker(Cam3DTracker):
             self.runtime_tracker.frame_index = 0
         self.runtime_tracker.time_delta = timestamp - self.runtime_tracker.timestamp
         self.runtime_tracker.timestamp = timestamp
-        
+
         # processing the queries from t-1
         prev_active_track_instances = self.runtime_tracker.track_instances
         for frame_idx in range(num_frame): # TODO remove this for loop, assume num_frame = 1 for prediction
@@ -290,8 +290,16 @@ class Fusion3DTracker(Cam3DTracker):
         ]
         if self.tracking:
             bbox_results[0]['track_ids'] = [f'{self.runtime_tracker.current_seq}-{i}' for i in bbox_results[0]['track_ids'].long().cpu().numpy().tolist()]
-
-        results_list_3d = [InstanceData(metainfo=results) for results in bbox_results]
+        results_list_3d = []
+        for results in bbox_results:
+            instance = InstanceData()
+            # instance = InstanceData(metainfo=results)
+            instance.bboxes_3d = results['bboxes_3d']
+            instance.labels_3d = results['labels_3d']
+            instance.scores_3d = results['scores_3d']
+            instance.track_scores = results['track_scores']
+            instance.track_ids = results['track_ids']
+            results_list_3d.append(instance)
         detsamples = self.add_pred_to_datasample(
             data_samples[0], data_instances_3d=results_list_3d
         )

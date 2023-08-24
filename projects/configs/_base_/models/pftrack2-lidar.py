@@ -149,13 +149,13 @@ model = dict(
         with_multiview=True,
         position_range=[-61.2, -61.2, -10.0, 61.2, 61.2, 10.0],
         normedlinear=False,
-        num_pred=1, # num decoder layers
+        num_pred=5, # num decoder layers
         transformer=dict(
             type='PETRTrackingTransformer',
             decoder=dict(
                 type='PETRTransformerDecoder',
                 return_intermediate=True,
-                num_layers=1,
+                num_layers=5,
                 transformerlayers=dict(
                     type='PETRTransformerDecoderLayer',
                     with_cp=False,
@@ -207,6 +207,7 @@ model = dict(
                 cls_cost=dict(type='FocalLossCost', weight=2.0),
                 reg_cost=dict(type='BBox3DL1Cost', weight=0.25),
                 iou_cost=dict(type='IoUCost', weight=0.0), # Fake cost. This is just to make it compatible with DETR head. 
+                iou_calculator=dict(type='BboxOverlaps3D', coordinate='lidar'),
                 # pc_range=point_cloud_range
                 )
             )
@@ -230,5 +231,6 @@ model = dict(
             cls_cost=dict(type='FocalLossCost', weight=2.0),
             reg_cost=dict(type='BBox3DL1Cost', weight=0.25),
             iou_cost=dict(type='IoUCost', weight=0.0), # Fake cost. This is just to make it compatible with DETR head. 
+            iou_calculator=dict(type='BboxOverlaps3D', coordinate='lidar'),
             # pc_range=point_cloud_range
             )))
