@@ -120,8 +120,8 @@ class TrackingLossBase(nn.Module):
 
         num_bboxes = bbox_pred.size(0)
         # assigner and sampler
-        assign_result = self.assigner.assign(bbox_pred, cls_score, gt_bboxes,
-                                             gt_labels, gt_bboxes_ignore)
+        assign_result = self.assigner.assign(bbox_pred.clone().detach(), cls_score.clone().detach(), 
+                                             gt_bboxes, gt_labels, gt_bboxes_ignore)
         pred_instance_3d = InstanceData(priors=bbox_pred)
         gt_instances_3d = InstanceData(bboxes_3d=gt_bboxes)
         sampling_result = self.sampler.sample(assign_result, pred_instance_3d,

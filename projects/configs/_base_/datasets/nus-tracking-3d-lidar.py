@@ -14,8 +14,8 @@ class_names = [
     'motorcycle', 'bicycle', 'pedestrian', 
     'construction_vehicle', 'traffic_cone', 'barrier'
 ]
-# metainfo = dict(classes=class_names, version='v1.0-trainval')
-metainfo = dict(classes=class_names, version='v1.0-mini')
+metainfo = dict(classes=class_names, version='v1.0-trainval')
+# metainfo = dict(classes=class_names, version='v1.0-mini')
 
 dataset_type = 'NuScenesTrackingDataset'
 data_root = './data/nuscenes/'
@@ -41,12 +41,13 @@ data_prefix = dict(
 backend_args = None
 
 # pkl paths
-# train_pkl_path = 'mmlab-v2/tracking_forecasting_infos_val.pkl'
-# test_pkl_path = 'mmlab-v2/tracking_forecasting_infos_val.pkl'
-# val_pkl_path = 'mmlab-v2/tracking_forecasting_infos_val.pkl'
-train_pkl_path = 'mmlab-v2/tracking_forecasting-mini_infos_val.pkl'
-test_pkl_path = 'mmlab-v2/tracking_forecasting-mini_infos_val.pkl'
-val_pkl_path = 'mmlab-v2/tracking_forecasting-mini_infos_val.pkl'
+# train_pkl_path = 'mmlab-v2/tracking_forecasting_infos_train.pkl'
+train_pkl_path = 'mmlab-v2/tracking_forecasting_infos_val.pkl'
+test_pkl_path = 'mmlab-v2/tracking_forecasting_infos_val.pkl'
+val_pkl_path = 'mmlab-v2/tracking_forecasting_infos_val.pkl'
+# train_pkl_path = 'mmlab-v2/tracking_forecasting-mini_infos_val.pkl'
+# test_pkl_path = 'mmlab-v2/tracking_forecasting-mini_infos_val.pkl'
+# val_pkl_path = 'mmlab-v2/tracking_forecasting-mini_infos_val.pkl'
 
 train_pipeline = [
     dict(

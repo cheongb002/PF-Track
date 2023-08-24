@@ -63,7 +63,7 @@ optim_wrapper = dict(
         ))
 )
 
-num_epochs = 200
+num_epochs = 20
 lr = 5e-5
 optim_wrapper = dict(
     type='OptimWrapper',
@@ -110,11 +110,11 @@ param_scheduler = [
         by_epoch=True,
         convert_to_iter_based=True)
 ]
-train_cfg = dict(max_epochs=num_epochs, val_interval=5)
-find_unused_parameters=False
+train_cfg = dict(max_epochs=num_epochs, val_interval=2)
+find_unused_parameters=True
 
-load_from='ckpts/BEVFusion/lidar/epoch_15.pth'
+load_from='ckpts/BEVFusion/lidar/epoch_20.pth'
 resume_from=None
 default_hooks=dict(
-    logger=dict(interval=80)
+    logger=dict(interval=100)
 )
