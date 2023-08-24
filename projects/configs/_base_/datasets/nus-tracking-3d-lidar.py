@@ -41,8 +41,7 @@ data_prefix = dict(
 backend_args = None
 
 # pkl paths
-# train_pkl_path = 'mmlab-v2/tracking_forecasting_infos_train.pkl'
-train_pkl_path = 'mmlab-v2/tracking_forecasting_infos_val.pkl'
+train_pkl_path = 'mmlab-v2/tracking_forecasting_infos_train.pkl'
 test_pkl_path = 'mmlab-v2/tracking_forecasting_infos_val.pkl'
 val_pkl_path = 'mmlab-v2/tracking_forecasting_infos_val.pkl'
 # train_pkl_path = 'mmlab-v2/tracking_forecasting-mini_infos_val.pkl'
