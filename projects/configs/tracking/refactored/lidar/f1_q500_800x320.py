@@ -33,7 +33,9 @@ file_client_args = dict(backend='disk')
 num_frames_per_sample = 1 # how many frames to train on
 train_dataloader = dict(
     dataset=dict(
-        num_frames_per_sample=num_frames_per_sample,
+        dataset=dict(
+            num_frames_per_sample=num_frames_per_sample,
+        )
     )
 )
 test_dataloader = dict(
