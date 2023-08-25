@@ -5,14 +5,9 @@ point_cloud_range = [-50, -50, -5, 50, 50, 3]
 # ego-coordinate point cloud range could bring a little promotion in nuScenes.
 # point_cloud_range = [-50, -50.8, -5, 50, 49.2, 3]
 # For nuScenes we usually do 10-class detection
-# class_names = [
-#     'car', 'truck', 'trailer', 'bus', 'construction_vehicle', 'bicycle',
-#     'motorcycle', 'pedestrian', 'traffic_cone', 'barrier'
-# ]
 class_names = [
-    'car', 'truck', 'bus', 'trailer', 
-    'motorcycle', 'bicycle', 'pedestrian', 
-    'construction_vehicle', 'traffic_cone', 'barrier'
+    'car', 'truck', 'trailer', 'bus', 'construction_vehicle', 'bicycle',
+    'motorcycle', 'pedestrian', 'traffic_cone', 'barrier'
 ]
 metainfo = dict(classes=class_names, version='v1.0-trainval')
 # metainfo = dict(classes=class_names, version='v1.0-mini')
@@ -22,9 +17,8 @@ data_root = './data/nuscenes/'
 # Input modality for nuScenes dataset, this is consistent with the submission
 # format which requires the information in input_modality.
 input_modality = dict(use_lidar=True, use_camera=False)
-data_prefix = dict(
-    pts='samples/LIDAR_TOP',
-    sweeps='sweeps/LIDAR_TOP')
+data_prefix = dict(pts='samples/LIDAR_TOP', sweeps='sweeps/LIDAR_TOP')
+
 # Example to use different file client
 # Method 1: simply set the data root and let the file I/O module
 # automatically infer from prefix (not support LMDB and Memcache yet)
@@ -67,12 +61,12 @@ train_pipeline = [
          with_bbox_3d=True, 
          with_label_3d=True, 
          with_forecasting=True),
-    # dict(
-    #     type='GlobalRotScaleTrans',
-    #     scale_ratio_range=[0.9, 1.1],
-    #     rot_range=[-0.78539816, 0.78539816],
-    #     translation_std=0.5),
-    # dict(type='BEVFusionRandomFlip3D'),
+    dict(
+        type='GlobalRotScaleTrans',
+        scale_ratio_range=[0.9, 1.1],
+        rot_range=[-0.78539816, 0.78539816],
+        translation_std=0.5),
+    dict(type='BEVFusionRandomFlip3D'),
     dict(type='PointsRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='TrackInstanceRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='TrackObjectNameFilter', classes=class_names),
@@ -148,22 +142,27 @@ train_dataloader = dict(
     persistent_workers=True,
     sampler=dict(type='DefaultSampler', shuffle=True),
     dataset=dict(
-        type=dataset_type,
-        num_frames_per_sample=1, # default single frame training
-        forecasting=True,
-        data_root=data_root,
-        ann_file=train_pkl_path,
-        pipeline=train_pipeline,
-        pipeline_multiframe=train_pipeline_multiframe,
-        metainfo=metainfo,
-        modality=input_modality,
-        test_mode=False,
-        data_prefix=data_prefix,
-        # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
-        # and box_type_3d='Depth' in sunrgbd and scannet dataset.
-        use_valid_flag=True,
-        box_type_3d='LiDAR',
-        backend_args=backend_args))
+        type='CBGSDataset',
+        dataset=dict(
+            type=dataset_type,
+            num_frames_per_sample=1, # default single frame training
+            forecasting=True,
+            data_root=data_root,
+            ann_file=train_pkl_path,
+            pipeline=train_pipeline,
+            pipeline_multiframe=train_pipeline_multiframe,
+            metainfo=metainfo,
+            modality=input_modality,
+            test_mode=False,
+            data_prefix=data_prefix,
+            # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
+            # and box_type_3d='Depth' in sunrgbd and scannet dataset.
+            use_valid_flag=True,
+            box_type_3d='LiDAR',
+            backend_args=backend_args
+        )
+    )
+)
 test_dataloader = dict(
     batch_size=1,
     num_workers=1,
