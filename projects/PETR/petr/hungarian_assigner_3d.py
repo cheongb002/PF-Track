@@ -110,7 +110,7 @@ class HungarianAssigner3D(BaseAssigner):
                 # No ground truth, assign all to background
                 assigned_gt_inds[:] = 0
             return AssignResult(
-                num_gts, assigned_gt_inds, None, labels=assigned_labels)
+                num_gts, assigned_gt_inds, bbox_pred.new_zeros(1), labels=assigned_labels)
 
         # 2. compute the weighted costs
         # classification and bboxcost.

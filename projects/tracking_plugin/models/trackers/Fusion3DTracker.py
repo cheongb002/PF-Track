@@ -329,7 +329,7 @@ class Fusion3DTracker(Cam3DTracker):
             fused_feats = self.extract_feat(input_dict, input_metas)
             # extract output from superbatch back to clip
             for frame_idx in range(num_frames):
-                outputs.append(fused_feats[frame_idx * batch_size:(frame_idx + 1) * batch_size])
+                outputs.append([fused_feats[0][frame_idx * batch_size:(frame_idx + 1) * batch_size]])
         else:
             # process each frame in clip separately
             for frame_idx, (img_frame, pts_frame) in enumerate(zip(img_clip, pts_clip)):
