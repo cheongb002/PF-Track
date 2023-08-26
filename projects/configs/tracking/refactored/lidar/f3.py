@@ -5,7 +5,9 @@ _base_ = [
 num_frames_per_sample = 3
 train_dataloader = dict(
     dataset=dict(
-        num_frames_per_sample=num_frames_per_sample,
+        dataset=dict(
+            num_frames_per_sample=num_frames_per_sample,
+        )
     )
 )
 test_dataloader = dict(
@@ -41,4 +43,7 @@ model = dict(
     ),
 )
 
+val_evaluator = dict(
+    type='NuScenesTrackingMetric'
+)
 load_from = 'work_dirs/refactored/lidar/f1_q500_800x320-mini/iou/epoch_200.pth'

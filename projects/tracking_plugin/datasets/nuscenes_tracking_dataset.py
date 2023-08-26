@@ -52,10 +52,7 @@ class NuScenesTrackingDataset(NuScenesDataset):
             return None
         ann_info = input_dict['ann_info'] if not self.test_mode \
             else input_dict['eval_ann_info']
-        if self.filter_empty_gt and ~(ann_info['gt_labels_3d'] != -1).any() and not self.test_mode:
-            print("filter empty gt")
-            print(input_dict is None)
-            print(~(ann_info['gt_labels_3d']!=-1))
+        if self.filter_empty_gt and (~(ann_info['gt_labels_3d'] != -1).any()):
             return None
         scene_token = input_dict['scene_token']
         data_queue = [input_dict]
