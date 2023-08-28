@@ -63,13 +63,8 @@ class TrackingLossBase(nn.Module):
         else:
             self.cls_out_channels = num_classes + 1
         
-        if code_weights is not None:
-            self.code_weights = code_weights
-        else:
-            self.code_weights = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.2, 0.2]
-        
         self.code_weights = nn.parameter.Parameter(torch.tensor(
-            self.code_weights, requires_grad=False), requires_grad=False)
+            code_weights, requires_grad=False), requires_grad=False)
         
         self.bg_cls_weight = 0
         self.sync_cls_avg_factor = sync_cls_avg_factor
@@ -125,8 +120,8 @@ class TrackingLossBase(nn.Module):
 
         num_bboxes = bbox_pred.size(0)
         # assigner and sampler
-        assign_result = self.assigner.assign(bbox_pred, cls_score, gt_bboxes,
-                                             gt_labels, gt_bboxes_ignore)
+        assign_result = self.assigner.assign(bbox_pred.clone().detach(), cls_score.clone().detach(), 
+                                             gt_bboxes, gt_labels, gt_bboxes_ignore)
         pred_instance_3d = InstanceData(priors=bbox_pred)
         gt_instances_3d = InstanceData(bboxes_3d=gt_bboxes)
         sampling_result = self.sampler.sample(assign_result, pred_instance_3d,
@@ -155,8 +150,12 @@ class TrackingLossBase(nn.Module):
         if pos_inds.numel() == 0:
             sampling_result.pos_gt_bboxes = gt_bboxes.new_empty((0, code_size))
         bbox_targets[pos_inds] = sampling_result.pos_gt_bboxes
+
+        ious = torch.clamp(assign_result.max_overlaps, min=0.0, max=1.0)
+        matched_ious = ious[pos_inds].sum() / max(len(pos_inds), 1)
+
         return (labels, label_instance_ids, label_weights, bbox_targets, bbox_weights, 
-                pos_inds, neg_inds, gt_match_idxes)
+                matched_ious, pos_inds, neg_inds, gt_match_idxes)
 
     def get_targets(self,
                     cls_scores_list,
@@ -202,14 +201,15 @@ class TrackingLossBase(nn.Module):
         ]
 
         (labels_list, label_instance_ids_list, label_weights_list, bbox_targets_list,
-         bbox_weights_list, pos_inds_list, neg_inds_list, gt_match_idxes_list) = multi_apply(
+         bbox_weights_list, matched_ious_list, pos_inds_list, neg_inds_list, gt_match_idxes_list) = multi_apply(
              self._get_target_single, cls_scores_list, bbox_preds_list,
              gt_labels_list, gt_bboxes_list, instance_ids_list, gt_bboxes_ignore_list)
         num_total_pos = sum((inds.numel() for inds in pos_inds_list))
         num_total_neg = sum((inds.numel() for inds in neg_inds_list))
+        matched_ious = torch.mean(torch.stack(matched_ious_list))
         return (labels_list, label_instance_ids_list, label_weights_list, bbox_targets_list,
-                bbox_weights_list, num_total_pos, num_total_neg, gt_match_idxes_list)
-    
+                bbox_weights_list, matched_ious, num_total_pos, num_total_neg, gt_match_idxes_list)
+
     def loss_single_decoder(self,
                             frame_idx,
                             cls_scores,
@@ -245,10 +245,10 @@ class TrackingLossBase(nn.Module):
             cls_reg_targets = self.get_targets(cls_scores_list, bbox_preds_list,
                                                gt_bboxes_list, gt_labels_list, instance_ids_list,
                                                gt_bboxes_ignore_list)
-            (labels_list, _, label_weights_list, bbox_targets_list, bbox_weights_list,
+            (labels_list, _, label_weights_list, bbox_targets_list, bbox_weights_list, matched_ious,
              num_total_pos, num_total_neg, gt_match_idxes_list) = cls_reg_targets
         else:
-            (labels_list, label_weights_list, bbox_targets_list, bbox_weights_list,
+            (labels_list, label_weights_list, bbox_targets_list, bbox_weights_list, matched_ious,
              num_total_pos, num_total_neg, gt_match_idxes_list) = gt_matching
         labels = torch.cat(labels_list, 0)
         label_weights = torch.cat(label_weights_list, 0)
@@ -277,7 +277,7 @@ class TrackingLossBase(nn.Module):
         bbox_preds = bbox_preds.reshape(-1, bbox_preds.size(-1))
         normalized_bbox_targets = normalize_bbox(bbox_targets, self.pc_range)
         isnotnan = torch.isfinite(normalized_bbox_targets).all(dim=-1)
-        bbox_weights = bbox_weights * torch.tensor(self.code_weights).to(bbox_preds.device)
+        bbox_weights = bbox_weights * self.code_weights.clone().detach().to(bbox_preds.device)
 
         loss_bbox = self.loss_bbox(
                 bbox_preds[isnotnan, :10], normalized_bbox_targets[isnotnan, :10], bbox_weights[isnotnan, :10], avg_factor=num_total_pos)
@@ -285,11 +285,13 @@ class TrackingLossBase(nn.Module):
         try:
             loss_cls = torch.nan_to_num(loss_cls)
             loss_bbox = torch.nan_to_num(loss_bbox)
+            matched_ious = torch.nan_to_num(matched_ious)
         except:
             loss_cls = nan_to_num(loss_cls)
             loss_bbox = nan_to_num(loss_bbox)
+            matched_ious = nan_to_num(matched_ious)
 
-        return loss_cls, loss_bbox
+        return loss_cls, loss_bbox, matched_ious
     
     def loss_single_frame(self,
                           frame_idx,
@@ -346,30 +348,33 @@ class TrackingLossBase(nn.Module):
         ]
 
         if self.interm_loss:
-            losses_cls, losses_bbox = multi_apply(
+            losses_cls, losses_bbox, matched_ious = multi_apply(
                 self.loss_single_decoder, [frame_idx for _ in range(num_dec_layers)], 
                 all_cls_scores, all_bbox_preds,
                 all_gt_bboxes_list, all_gt_labels_list, all_instance_ids_list,
                 all_gt_bboxes_ignore_list)
         else:
-            losses_cls, losses_bbox = self.loss_single_decoder(num_dec_layers - 1,
+            losses_cls, losses_bbox, matched_ious = self.loss_single_decoder(num_dec_layers - 1,
                 all_cls_scores[-1], all_bbox_preds[-1],
                 all_gt_bboxes_list[-1], all_gt_labels_list[-1], all_instance_ids_list[-1],
                 all_gt_bboxes_ignore_list[-1])
-            losses_cls, losses_bbox = [losses_cls], [losses_bbox]
+            losses_cls, losses_bbox, matched_ious = [losses_cls], [losses_bbox], [matched_ious]
 
         loss_dict = dict()
 
         # loss from the last decoder layer
         loss_dict[f'f{frame_idx}.loss_cls'] = losses_cls[-1]
         loss_dict[f'f{frame_idx}.loss_bbox'] = losses_bbox[-1]
+        loss_dict[f'f{frame_idx}.matched_iou'] = matched_ious[-1]
 
         # loss from other decoder layers
         num_dec_layer = 0
-        for loss_cls_i, loss_bbox_i in zip(losses_cls[:-1],
-                                           losses_bbox[:-1]):
+        for loss_cls_i, loss_bbox_i, matched_iou_i in zip(losses_cls[:-1], 
+                                                          losses_bbox[:-1],
+                                                          matched_ious[:-1]):
             loss_dict[f'f{frame_idx}.d{num_dec_layer}.loss_cls'] = loss_cls_i
             loss_dict[f'f{frame_idx}.d{num_dec_layer}.loss_bbox'] = loss_bbox_i
+            loss_dict[f'f{frame_idx}.d{num_dec_layer}.matched_iou'] = matched_iou_i
             num_dec_layer += 1
 
         return loss_dict

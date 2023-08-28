@@ -1,4 +1,4 @@
-voxel_size = [0.2, 0.2, 8]
+voxel_size = [0.075, 0.075, 0.2]
 
 
 model = dict(
@@ -11,8 +11,8 @@ model = dict(
         pad_size_divisor=32),
     voxelize_cfg=dict(
         max_num_points=10,
-        point_cloud_range=[-54.0, -54.0, -5.0, 54.0, 54.0, 3.0],
-        voxel_size=[0.075, 0.075, 0.2],
+        # point_cloud_range=[-54.0, -54.0, -5.0, 54.0, 54.0, 3.0],
+        voxel_size=voxel_size,
         max_voxels=[120000, 160000]),
     voxelize_reduce=True,
     tracking=False,
@@ -140,49 +140,6 @@ model = dict(
         norm_cfg=dict(type='BN', eps=0.001, momentum=0.01),
         upsample_cfg=dict(type='deconv', bias=False),
         use_conv_for_no_stride=True),
-    img_backbone=dict(
-        type='mmdet.SwinTransformer',
-        embed_dims=96,
-        depths=[2, 2, 6, 2],
-        num_heads=[3, 6, 12, 24],
-        window_size=7,
-        mlp_ratio=4,
-        qkv_bias=True,
-        qk_scale=None,
-        drop_rate=0.0,
-        attn_drop_rate=0.0,
-        drop_path_rate=0.2,
-        patch_norm=True,
-        out_indices=[1, 2, 3],
-        with_cp=False,
-        convert_weights=True,
-        init_cfg=dict(
-            type='Pretrained',
-            checkpoint=  # noqa: E251
-            'https://github.com/SwinTransformer/storage/releases/download/v1.0.0/swin_tiny_patch4_window7_224.pth'  # noqa: E501
-        )),
-    img_neck=dict(
-        type='GeneralizedLSSFPN',
-        in_channels=[192, 384, 768],
-        out_channels=256,
-        start_level=0,
-        num_outs=3,
-        norm_cfg=dict(type='BN2d', requires_grad=True),
-        act_cfg=dict(type='ReLU', inplace=True),
-        upsample_cfg=dict(mode='bilinear', align_corners=False)),
-    view_transform=dict(
-        type='DepthLSSTransform',
-        in_channels=256,
-        out_channels=80,
-        image_size=[256, 704],
-        feature_size=[32, 88],
-        xbound=[-54.0, 54.0, 0.3],
-        ybound=[-54.0, 54.0, 0.3],
-        zbound=[-10.0, 10.0, 20.0],
-        dbound=[1.0, 60.0, 0.5],
-        downsample=2),
-    fusion_layer=dict(
-        type='ConvFuser', in_channels=[80, 256], out_channels=256),
     pts_bbox_head=dict(
         type='BEVFusionTrackingHead',
         num_classes=10,
@@ -241,7 +198,7 @@ model = dict(
     # model training and testing settings
     train_cfg=dict(
         pts=dict(
-            grid_size=[512, 512, 1],
+            grid_size=[1440, 1440, 41],
             voxel_size=voxel_size,
             # point_cloud_range=point_cloud_range,
             out_size_factor=4,
@@ -250,6 +207,7 @@ model = dict(
                 cls_cost=dict(type='FocalLossCost', weight=2.0),
                 reg_cost=dict(type='BBox3DL1Cost', weight=0.25),
                 iou_cost=dict(type='IoUCost', weight=0.0), # Fake cost. This is just to make it compatible with DETR head. 
+                iou_calculator=dict(type='BboxOverlaps3D', coordinate='lidar'),
                 # pc_range=point_cloud_range
                 )
             )
@@ -273,5 +231,6 @@ model = dict(
             cls_cost=dict(type='FocalLossCost', weight=2.0),
             reg_cost=dict(type='BBox3DL1Cost', weight=0.25),
             iou_cost=dict(type='IoUCost', weight=0.0), # Fake cost. This is just to make it compatible with DETR head. 
+            iou_calculator=dict(type='BboxOverlaps3D', coordinate='lidar'),
             # pc_range=point_cloud_range
             )))

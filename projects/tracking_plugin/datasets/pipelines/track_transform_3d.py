@@ -107,6 +107,7 @@ class TrackResizeCropFlipImage(ResizeCropFlipImage):
         resize, resize_dims, crop, flip, rotate = self._sample_augmentation()
         for frame_idx, data in enumerate(data_queue):
             new_imgs_frame = []
+            transforms = []
             for cam_idx, img in enumerate(data['img']):
                 img = Image.fromarray(np.uint8(img))
                 # augmentation (resize, crop, horizontal flip, rotate)
@@ -121,12 +122,19 @@ class TrackResizeCropFlipImage(ResizeCropFlipImage):
                 new_imgs_frame.append(np.array(img).astype(np.float32))
                 data_queue[frame_idx]['intrinsics'][cam_idx][:3, :3] = \
                     ida_mat @ data_queue[frame_idx]['intrinsics'][cam_idx][:3, :3]
+                # convert from 3x4 to 4x4 matrix for BEVFusion DepthLSS
+                transform = torch.eye(4)
+                transform[:2, :2] = ida_mat[:2, :2]
+                transform[:2, 3] = ida_mat[:2, 2]
+                transforms.append(transform.numpy())
+
             data_queue[frame_idx]['img'] = new_imgs_frame
             data_queue[frame_idx]['lidar2img'] = \
                 [intrinsics @ extrinsics.T for intrinsics, extrinsics in zip(
                     data_queue[frame_idx]['intrinsics'],
                     data_queue[frame_idx]['extrinsics']
                 )]
+            data_queue[frame_idx]['img_aug_matrix'] = transforms
 
         return data_queue
 

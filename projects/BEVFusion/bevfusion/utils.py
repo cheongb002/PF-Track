@@ -245,7 +245,7 @@ class HeuristicAssigner3D(BaseAssigner):
             labels=assigned_gt_labels)
 
 
-@TASK_UTILS.register_module()
+# @TASK_UTILS.register_module()
 class HungarianAssigner3D(BaseAssigner):
 
     def __init__(self,

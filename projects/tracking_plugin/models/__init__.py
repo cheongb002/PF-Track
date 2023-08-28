@@ -1,5 +1,5 @@
-from .dense_heads import PETRCamTrackingHead, DETR3DCamTrackingHead
+from .dense_heads import PETRCamTrackingHead, DETR3DCamTrackingHead, BEVFusionTrackingHead
 from .losses import TrackingLossBase, TrackingLoss
-from .trackers import Cam3DTracker
+from .trackers import Cam3DTracker, Fusion3DTracker
 from .utils import PETRTrackingTransformer
 from .data_preprocessors import TrackDataPreprocessor

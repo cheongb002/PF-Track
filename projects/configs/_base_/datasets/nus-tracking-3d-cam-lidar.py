@@ -46,48 +46,42 @@ backend_args = None
 
 ida_aug_conf = {
     "resize_lim": (0.47, 0.625),
-    "final_dim": (320, 800),
+    "final_dim": (256, 704),
     "bot_pct_lim": (0.0, 0.0),
     "rot_lim": (0.0, 0.0),
     "H": 900,
     "W": 1600,
-    "rand_flip": True,
+    "rand_flip": False,
 }
 
 train_pipeline = [
-    # dict(
-    #     type='LoadPointsFromFile', # visualization purpose
-    #     coord_type='LIDAR',
-    #     load_dim=5,
-    #     use_dim=5,
-    #     backend_args=backend_args),
-    # dict(
-    #     type='LoadPointsFromMultiSweeps',
-    #     sweeps_num=9,
-    #     load_dim=5,
-    #     use_dim=5,
-    #     pad_empty_sweeps=True,
-    #     remove_close=True,
-    #     backend_args=backend_args),
-    # dict(
-    #     type='PointsRangeFilter',
-    #     point_cloud_range=[-54.0, -54.0, -5.0, 54.0, 54.0, 3.0]),
-    # dict(type='PointShuffle'),
-    # dict(
-    #     type='BEVLoadMultiViewImageFromFiles',
-    #     to_float32=True,
-    #     color_type='color',
-    #     backend_args=backend_args),
     dict(
-        type='LoadMultiViewImageFromFiles',
+        type='BEVLoadMultiViewImageFromFiles',
         to_float32=True,
+        color_type='color',
+        backend_args=backend_args),
+    dict(
+        type='LoadPointsFromFile',
+        coord_type='LIDAR',
+        load_dim=5,
+        use_dim=5,
+        backend_args=backend_args),
+    dict(
+        type='LoadPointsFromMultiSweeps',
+        sweeps_num=9,
+        load_dim=5,
+        use_dim=5,
+        pad_empty_sweeps=True,
+        remove_close=True,
         backend_args=backend_args),
     dict(type='TrackLoadAnnotations3D', 
          with_bbox_3d=True, 
          with_label_3d=True, 
          with_forecasting=True),
+    dict(type='PointsRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='TrackInstanceRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='TrackObjectNameFilter', classes=class_names),
+    dict(type='PointShuffle'),
 ]
 
 train_pipeline_multiframe = [
@@ -106,38 +100,35 @@ train_pipeline_multiframe = [
 ]
 
 test_pipeline = [
-    dict(type='LoadMultiViewImageFromFiles',
-         to_float32=True,
-         backend_args=backend_args),
-    # dict(
-    #     type='BEVLoadMultiViewImageFromFiles',
-    #     to_float32=True,
-    #     color_type='color',
-    #     backend_args=backend_args),
-    # dict(
-    #     type='LoadPointsFromFile',
-    #     coord_type='LIDAR',
-    #     load_dim=5,
-    #     use_dim=5,
-    #     backend_args=backend_args),
-    # dict(
-    #     type='LoadPointsFromMultiSweeps',
-    #     sweeps_num=9,
-    #     load_dim=5,
-    #     use_dim=5,
-    #     pad_empty_sweeps=True,
-    #     remove_close=True,
-    #     backend_args=backend_args),
-    # dict(
-    #     type='PointsRangeFilter',
-    #     point_cloud_range=[-54.0, -54.0, -5.0, 54.0, 54.0, 3.0]),
+    dict(
+        type='BEVLoadMultiViewImageFromFiles',
+        to_float32=True,
+        color_type='color',
+        backend_args=backend_args),
+    dict(
+        type='LoadPointsFromFile',
+        coord_type='LIDAR',
+        load_dim=5,
+        use_dim=5,
+        backend_args=backend_args),
+    dict(
+        type='LoadPointsFromMultiSweeps',
+        sweeps_num=9,
+        load_dim=5,
+        use_dim=5,
+        pad_empty_sweeps=True,
+        remove_close=True,
+        backend_args=backend_args),
+    dict(
+        type='PointsRangeFilter',
+        point_cloud_range=point_cloud_range),
 ]
 
 test_pipeline_multiframe = [
     dict(type='TrackResizeCropFlipImage', data_aug_conf = ida_aug_conf, training=False),
     dict(
         type='Pack3DTrackInputs',
-        keys=['img'],
+        keys=['img', 'points'],
         meta_keys=[
             'cam2img', 'ori_cam2img', 'lidar2cam', 'lidar2img', 'cam2lidar',
             'ori_lidar2img', 'img_aug_matrix', 'box_type_3d', 'sample_idx',
@@ -184,7 +175,6 @@ train_dataloader = dict(
         metainfo=metainfo,
         modality=input_modality,
         test_mode=False,
-        use_valid_flag=False,
         data_prefix=data_prefix,
         # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
         # and box_type_3d='Depth' in sunrgbd and scannet dataset.

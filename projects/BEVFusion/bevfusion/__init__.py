@@ -7,7 +7,7 @@ from .transformer import TransformerDecoderLayer
 from .transforms_3d import (BEVFusionGlobalRotScaleTrans,
                             BEVFusionRandomFlip3D, GridMask, ImageAug3D)
 from .transfusion_head import ConvFuser, TransFusionHead
-from .utils import (BBoxBEVL1Cost, HeuristicAssigner3D, HungarianAssigner3D,
+from .utils import (BBoxBEVL1Cost, HeuristicAssigner3D,
                     IoU3DCost)
 
 __all__ = [

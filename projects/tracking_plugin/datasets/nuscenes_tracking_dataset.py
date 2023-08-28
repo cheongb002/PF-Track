@@ -48,11 +48,11 @@ class NuScenesTrackingDataset(NuScenesDataset):
     def prepare_data(self, index: int) -> Union[dict, None]:
         input_dict = self._prepare_data_single(index)
         if input_dict is None:
+            print("input dict is None")
             return None
         ann_info = input_dict['ann_info'] if not self.test_mode \
             else input_dict['eval_ann_info']
-        if self.filter_empty_gt and \
-                (input_dict is None or ~(ann_info['gt_labels_3d'] != -1).any()):
+        if self.filter_empty_gt and (~(ann_info['gt_labels_3d'] != -1).any()):
             return None
         scene_token = input_dict['scene_token']
         data_queue = [input_dict]
@@ -65,9 +65,8 @@ class NuScenesTrackingDataset(NuScenesDataset):
                 return None
             ann_info = data_info_i['ann_info'] if not self.test_mode \
                 else data_info_i['eval_ann_info']
-            if self.filter_empty_gt and \
-                (data_info_i is None or
-                    ~(ann_info['gt_labels_3d'] != -1).any()):
+            if self.filter_empty_gt and ~(ann_info['gt_labels_3d'] != -1).any() and not self.test_mode:
+                print("filter empty gt in index")
                 return None
             data_queue.append(data_info_i)
 
@@ -102,6 +101,7 @@ class NuScenesTrackingDataset(NuScenesDataset):
         # pre-pipline return None to random another in `__getitem__`
         if not self.test_mode and self.filter_empty_gt:
             if len(input_dict['ann_info']['gt_labels_3d']) == 0:
+                print("filter empty gt in prepare data")
                 return None
 
         example = self.pipeline(input_dict)
@@ -111,6 +111,7 @@ class NuScenesTrackingDataset(NuScenesDataset):
             # return None to random another in `__getitem__`
             if example is None or len(
                     example['gt_bboxes_3d']) == 0:
+                print("filter empty gt in prepare data or example is None")
                 return None
 
         if self.show_ins_var:

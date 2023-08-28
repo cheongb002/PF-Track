@@ -306,7 +306,7 @@ class Cam3DTracker(PETR):
         assert batch_size == 1, "Currently only support batch size 1"
 
         # Image features, one clip at a time for checkpoint usages
-        img_feats = self.extract_clip_imgs_feats(img=img) # output gets put into frame first
+        img_feats = self.extract_clip_imgs_feats(img=img)
 
         # Empty the runtime_tracker
         # Use PETR head to decode the bounding boxes on every frame
@@ -393,10 +393,7 @@ class Cam3DTracker(PETR):
         self.runtime_tracker.empty()
         return losses
 
-    def predict(
-            self,
-            inputs:dict,
-            data_samples):
+    def predict(self, inputs:dict, data_samples):
         imgs = inputs['imgs'] # bs, num frames, num cameras (6), C, H, W
         batch_size = len(imgs)
         assert batch_size == 1, "Only support single bs prediction"
@@ -525,7 +522,6 @@ class Cam3DTracker(PETR):
 
         # backbone images
         # get all the images and let backbone infer for once
-        # all_imgs = list()
         dummy_img_metas = [dict() for _ in range(batch_size)] # metas not actually required to extract features
 
         # all imgs B * (T * NumCam) * C * H * W, T is frame num
@@ -559,7 +555,7 @@ class Cam3DTracker(PETR):
             nn.init.zeros_(self.query_feat_embedding.weight)
         
         # freeze backbone
-        if not self.train_backbone:
+        if not self.train_backbone and self.with_img_backbone:
             for param in self.img_backbone.parameters():
                 param.requires_grad = False
         return

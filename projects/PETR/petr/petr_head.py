@@ -114,6 +114,7 @@ class PETRHead(AnchorFreeHead):
                  position_range=[-65, -65, -8.0, 65, 65, 8.0],
                  init_cfg=None,
                  normedlinear=False,
+                 num_pred:int=6,
                  **kwargs):
         # NOTE here use `AnchorFreeHead` instead of `TransformerHead`,
         # since it brings inconvenience when the initialization of
@@ -193,7 +194,7 @@ class PETRHead(AnchorFreeHead):
             f' and {num_feats}.'
         self.act_cfg = transformer.get('act_cfg',
                                        dict(type='ReLU', inplace=True))
-        self.num_pred = 6
+        self.num_pred = num_pred
         self.normedlinear = normedlinear
         super(PETRHead, self).__init__(
             num_classes=num_classes,
@@ -215,7 +216,9 @@ class PETRHead(AnchorFreeHead):
         # if self.with_multiview or not self.with_position:
         #     self.positional_encoding = build_positional_encoding(
         #         positional_encoding)
-        self.positional_encoding = TASK_UTILS.build(positional_encoding)
+        # self.positional_encoding = TASK_UTILS.build(positional_encoding)
+        self.positional_encoding = MODELS.build(positional_encoding)
+
         self.transformer = MODELS.build(transformer)
         self.code_weights = nn.Parameter(
             torch.tensor(self.code_weights, requires_grad=False),

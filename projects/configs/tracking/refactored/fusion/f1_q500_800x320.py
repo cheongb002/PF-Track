@@ -1,8 +1,8 @@
 _base_ = [
-    '../../_base_/datasets/nus-tracking-3d-cam.py',
-    '../../_base_/default_runtime.py',
-    '../../_base_/schedules/cosine.py',
-    '../../_base_/models/pftrack.py'
+    '../../../_base_/datasets/nus-tracking-3d-cam-lidar.py',
+    '../../../_base_/default_runtime.py',
+    '../../../_base_/schedules/cosine.py',
+    '../../../_base_/models/pftrack2.py'
 ]
 custom_imports = dict(imports=['projects.BEVFusion.bevfusion'], allow_failed_imports=False)
 custom_imports = dict(imports=['projects.tracking_plugin'], allow_failed_imports=False)
@@ -70,5 +70,8 @@ param_scheduler = [
 train_cfg = dict(type='EpochBasedTrainLoop', max_epochs=num_epochs, val_interval=1)
 find_unused_parameters=False
 
-load_from='ckpts/f1/fcos3d_vovnet_imgbackbone-remapped.pth'
+# load_from='ckpts/f1/fcos3d_vovnet_imgbackbone-remapped.pth'
 resume_from=None
+default_hooks=dict(
+    logger=dict(interval=1)
+)

@@ -11,7 +11,7 @@ import torch
 from mmdet.models.task_modules import AssignResult, BaseAssigner
 
 from mmdet3d.registry import TASK_UTILS
-from projects.PETR.petr.utils import normalize_bbox
+from projects.PETR.petr.utils import normalize_bbox, denormalize_bbox
 
 try:
     from scipy.optimize import linear_sum_assignment
@@ -50,10 +50,12 @@ class HungarianAssigner3D(BaseAssigner):
                  cls_cost=dict(type='ClassificationCost', weight=1.),
                  reg_cost=dict(type='BBoxL1Cost', weight=1.0),
                  iou_cost=dict(type='IoUCost', weight=0.0),
+                 iou_calculator=dict(type='BboxOverlaps3D', coordinate='lidar'),
                  pc_range=None):
         self.cls_cost = TASK_UTILS.build(cls_cost)
         self.reg_cost = TASK_UTILS.build(reg_cost)
         self.iou_cost = TASK_UTILS.build(iou_cost)
+        self.iou_calculator = TASK_UTILS.build(iou_calculator)
         self.pc_range = pc_range
 
     def assign(self,
@@ -108,7 +110,7 @@ class HungarianAssigner3D(BaseAssigner):
                 # No ground truth, assign all to background
                 assigned_gt_inds[:] = 0
             return AssignResult(
-                num_gts, assigned_gt_inds, None, labels=assigned_labels)
+                num_gts, assigned_gt_inds, bbox_pred.new_zeros(1), labels=assigned_labels)
 
         # 2. compute the weighted costs
         # classification and bboxcost.
@@ -116,6 +118,8 @@ class HungarianAssigner3D(BaseAssigner):
         # regression L1 cost
         normalized_gt_bboxes = normalize_bbox(gt_bboxes, self.pc_range)
         reg_cost = self.reg_cost(bbox_pred[:, :8], normalized_gt_bboxes[:, :8])
+        decoded_bbox_pred = denormalize_bbox(bbox_pred, self.pc_range)
+        iou = self.iou_calculator(decoded_bbox_pred, gt_bboxes)
 
         # weighted sum of above two costs
         cost = cls_cost + reg_cost
@@ -138,5 +142,9 @@ class HungarianAssigner3D(BaseAssigner):
         # assign foregrounds based on matching results
         assigned_gt_inds[matched_row_inds] = matched_col_inds + 1
         assigned_labels[matched_row_inds] = gt_labels[matched_col_inds]
+
+        max_overlaps = torch.zeros_like(iou.max(1).values)
+        max_overlaps[matched_row_inds] = iou[matched_row_inds,
+                                             matched_col_inds]
         return AssignResult(
-            num_gts, assigned_gt_inds, None, labels=assigned_labels)
+            num_gts, assigned_gt_inds, max_overlaps, labels=assigned_labels)

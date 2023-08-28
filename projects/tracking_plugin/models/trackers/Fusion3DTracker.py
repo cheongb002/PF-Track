@@ -1,33 +1,74 @@
 # ------------------------------------------------------------------------
 # Copyright (c) 2023 toyota research instutute.
 # ------------------------------------------------------------------------
-from typing import List, Union
+from copy import deepcopy
+from typing import Optional
 
+import numpy as np
 import torch
-import torch.nn as nn
 from mmdet3d.registry import MODELS
-from mmdet3d.structures.det3d_data_sample import ForwardResults, OptSampleList
 from mmengine.structures import InstanceData
+from torch.nn import functional as F
 
-from projects.PETR.petr.petr_head import pos2posemb3d
+from projects.BEVFusion.bevfusion.ops import Voxelization
 from projects.tracking_plugin.core.instances import Instances
 
-from .Cam3DTracker import Cam3DTracker
-from .runtime_tracker import RunTimeTracker
-from .spatial_temporal_reason import SpatialTemporalReasoner
+from .Cam3DTracker import Cam3DTracker, track_bbox3d2result
 
 
 @MODELS.register_module()
 class Fusion3DTracker(Cam3DTracker):
+    def __init__(
+            self, 
+            *args, 
+            voxelize_cfg:dict, 
+            voxelize_reduce:bool,
+            view_transform:Optional[dict]=None,
+            fusion_layer:Optional[dict]=None,
+            batch_clip:bool=True,
+            **kwargs
+        ):
+        """Fusion3DTracker.
+        Args:
+            batch_clip (bool, optional): Whether to put frames from clip into a single
+            batch. If out of memory errors, set to False.
+        """
+        super().__init__(*args, **kwargs)
+        self.batch_clip = batch_clip
+        self.pts_voxel_layer = Voxelization(**voxelize_cfg)
+        self.voxelize_reduce = voxelize_reduce
+
+        if fusion_layer is not None:
+            self.fusion_layer = MODELS.build(fusion_layer)
+            assert view_transform is not None, "view_transform should be provided when fusion_layer is not None"
+            self.view_transform = MODELS.build(view_transform)
+        if not self.train_backbone:
+            for param in self.pts_voxel_encoder.parameters():
+                param.requires_grad = False
+            for param in self.pts_middle_encoder.parameters():
+                param.requires_grad = False
+            for param in self.pts_backbone.parameters():
+                param.requires_grad = False
+            for param in self.pts_neck.parameters():
+                param.requires_grad = False
+            if self.with_img_backbone:
+                for param in self.img_backbone.parameters():
+                    param.requires_grad = False
+            if self.with_img_neck:
+                for param in self.img_neck.parameters():
+                    param.requires_grad = False
+            if self.with_fusion:
+                for param in self.fusion_layer.parameters():
+                    param.requires_grad = False
+
+    def init_weights(self) -> None:
+        if self.with_img_backbone:
+            self.img_backbone.init_weights()
+
     def loss(
             self,
             inputs:dict,
-            data_samples,
-            gt_bboxes_3d=None,
-            gt_labels_3d=None,
-            gt_forecasting_locs=None,
-            gt_forecasting_masks=None,
-            instance_inds=None):
+            data_samples):
         """Forward training function.
         Args:
             points (list[torch.Tensor], optional): Points of each sample.
@@ -52,69 +93,66 @@ class Fusion3DTracker(Cam3DTracker):
         Returns:
             dict: Losses of different branches.
         """
-        img = inputs['imgs']
-        batch_size = len(img)
-        num_frame = img[0].shape[0]
+        points = inputs['points']
+        num_frame = len(points)
 
-        # Image features, one clip at a time for checkpoint usages
-        img_feats = self.extract_clip_imgs_feats(img=img)
+        # extract the features of multi-frame images and points
+        fused_feats = self.extract_clip_feats(inputs, data_samples)
 
-        # transform labels to a temporal frame-first sense
-        # ff_gt_bboxes_list, ff_gt_labels_list, ff_instance_ids = list(), list(), list()
-        # for i in range(num_frame):
-        #     ff_gt_bboxes_list.append([gt_bboxes_3d[j][i] for j in range(batch_size)])
-        #     ff_gt_labels_list.append([gt_labels_3d[j][i] for j in range(batch_size)])
-        #     ff_instance_ids.append([instance_inds[j][i] for j in range(batch_size)])
-        
         # Empty the runtime_tracker
         # Use PETR head to decode the bounding boxes on every frame
         outs = list()
+        # returns only single set of track instances, corresponding to single batch
         next_frame_track_instances = self.generate_empty_instance()
-        # img_metas_keys = img_metas[0].keys()
+        device = next_frame_track_instances.reference_points.device
 
         # Running over all the frames one by one
         self.runtime_tracker.empty()
-        for frame_idx in range(num_frame):
-            # img_metas_single_frame = list()
-            # for batch_idx in range(batch_size):
-            #     img_metas_single_sample = {key: img_metas[batch_idx][key][frame_idx] for key in img_metas_keys}
-            #     img_metas_single_frame.append(img_metas_single_sample)
+        for frame_idx, data_samples_frame in enumerate(data_samples):
+            img_metas_single_frame = [ds_batch.metainfo for ds_batch in data_samples_frame]
+            ff_gt_bboxes_list = [ds_batch.gt_instances_3d.bboxes_3d for ds_batch in data_samples_frame]
+            ff_gt_labels_list = [ds_batch.gt_instances_3d.labels_3d for ds_batch in data_samples_frame]
+            ff_instance_inds = [ds_batch.gt_instances_3d.instance_inds for ds_batch in data_samples_frame]
+            gt_forecasting_locs = data_samples_frame[0].gt_instances_3d.forecasting_locs
+            gt_forecasting_masks = data_samples_frame[0].gt_instances_3d.forecasting_masks
 
             # PETR detection head
             track_instances = next_frame_track_instances
-            out = self.pts_bbox_head(img_feats[frame_idx], img_metas_single_frame, 
-                                     track_instances.query_feats, track_instances.query_embeds, 
-                                     track_instances.reference_points)
+            out = self.pts_bbox_head(
+                fused_feats[frame_idx], img_metas_single_frame, 
+                track_instances.query_feats, track_instances.query_embeds, 
+                track_instances.reference_points)
 
             # 1. Record the information into the track instances cache
             track_instances = self.load_detection_output_into_cache(track_instances, out)
             out['track_instances'] = track_instances
-            # out['points'] = points[0][frame_idx]
 
             # 2. Loss computation for the detection
             out['loss_dict'] = self.criterion.loss_single_frame(
-                frame_idx, ff_gt_bboxes_list[frame_idx], ff_gt_labels_list[frame_idx],
-                ff_instance_ids[frame_idx], out, None)
+                frame_idx, ff_gt_bboxes_list, ff_gt_labels_list,
+                ff_instance_inds, out, None)
 
             # 3. Spatial-temporal reasoning
             track_instances = self.STReasoner(track_instances)
 
             if self.STReasoner.history_reasoning:
-                out['loss_dict'] = self.criterion.loss_mem_bank(frame_idx,
-                                                                out['loss_dict'],
-                                                                ff_gt_bboxes_list[frame_idx],
-                                                                ff_gt_labels_list[frame_idx],
-                                                                ff_instance_ids[frame_idx],
-                                                                track_instances)
-            
+                out['loss_dict'] = self.criterion.loss_mem_bank(
+                    frame_idx,
+                    out['loss_dict'],
+                    ff_gt_bboxes_list,
+                    ff_gt_labels_list,
+                    ff_instance_inds,
+                    track_instances)
+
             if self.STReasoner.future_reasoning:
                 active_mask = (track_instances.obj_idxes >= 0)
-                out['loss_dict'] = self.forward_loss_prediction(frame_idx,
-                                                                out['loss_dict'],
-                                                                track_instances[active_mask],
-                                                                gt_forecasting_locs[frame_idx],
-                                                                gt_forecasting_masks[frame_idx],
-                                                                ff_instance_ids[frame_idx])
+                out['loss_dict'] = self.forward_loss_prediction(
+                    frame_idx,
+                    out['loss_dict'],
+                    track_instances[active_mask],
+                    gt_forecasting_locs,
+                    gt_forecasting_masks,
+                    ff_instance_inds)
 
             # 4. Prepare for next frame
             track_instances = self.frame_summarization(track_instances, tracking=False)
@@ -122,14 +160,19 @@ class Fusion3DTracker(Cam3DTracker):
             track_instances.track_query_mask[active_mask] = True
             active_track_instances = track_instances[active_mask]
             if self.motion_prediction and frame_idx < num_frame - 1:
-                time_delta = timestamps[frame_idx + 1] - timestamps[frame_idx]
-                active_track_instances = self.update_reference_points(active_track_instances,
-                                                                      time_delta,
-                                                                      use_prediction=self.motion_prediction_ref_update,
-                                                                      tracking=False)
+                # assume batch size is 1
+                time_delta = data_samples[frame_idx+1][0].metainfo['timestamp'] - data_samples[frame_idx][0].metainfo['timestamp']
+                active_track_instances = self.update_reference_points(
+                    active_track_instances,
+                    time_delta,
+                    use_prediction=self.motion_prediction_ref_update,
+                    tracking=False)
             if self.if_update_ego and frame_idx < num_frame - 1:
                 active_track_instances = self.update_ego(
-                    active_track_instances, lidar2global[frame_idx], lidar2global[frame_idx + 1])
+                    active_track_instances, 
+                    data_samples[frame_idx][0].metainfo['lidar2global'].to(device), 
+                    data_samples[frame_idx + 1][0].metainfo['lidar2global'].to(device),
+                )
             if frame_idx < num_frame - 1:
                 active_track_instances = self.STReasoner.sync_pos_embedding(active_track_instances, self.query_embedding)
             
@@ -141,36 +184,15 @@ class Fusion3DTracker(Cam3DTracker):
         self.runtime_tracker.empty()
         return losses
 
-    def predict(
-            self,
-            inputs:dict,
-            data_samples):
-        # breakpoint()
-        imgs = inputs['imgs'] # bs, num frames, num cameras (6), C, H, W
-        batch_size = len(imgs)
-        assert batch_size == 1, "Only support single bs prediction"
-        num_frame = imgs[0].shape[0]
+    def predict(self, inputs:dict, data_samples):
+        points = inputs['points']
+        num_frame = len(points)
+        batch_size = len(points[0])
         assert num_frame == 1, "Only support single frame prediction"
+        assert batch_size == 1, "Only support single bs prediction"
 
-        # backbone images
-        img_feats = self.extract_clip_imgs_feats(img=imgs)
-        # breakpoint()
-        # image metas
-        # all_img_metas = list()
-        # img_metas_keys = batch_img_metas[0].keys()
-        # for i in range(batch_size):
-        #     img_metas_single_sample = dict()
-        #     for key in img_metas_keys:
-        #         # join the fields of every timestamp
-        #         if type(batch_img_metas[i][key][0]) == list:
-        #             contents = deepcopy(batch_img_metas[i][key][0])
-        #             for j in range(1, num_frame):
-        #                 contents += batch_img_metas[i][key][j]
-        #         # pick the representative one
-        #         else:
-        #             contents = deepcopy(batch_img_metas[i][key][0])
-        #     img_metas_single_sample[key] = contents
-        #     all_img_metas.append(img_metas_single_sample)
+        # extract the features of multi-frame images and points
+        fused_feats = self.extract_clip_feats(inputs, data_samples)
         
         # new sequence
         timestamp = data_samples[0][0].metainfo['timestamp']
@@ -189,9 +211,7 @@ class Fusion3DTracker(Cam3DTracker):
         prev_active_track_instances = self.runtime_tracker.track_instances
         for frame_idx in range(num_frame): # TODO remove this for loop, assume num_frame = 1 for prediction
             img_metas_single_frame = [ds[frame_idx].metainfo for ds in data_samples]
-            # for batch_idx in range(batch_size):
-            #     img_metas_single_sample = {key: batch_img_metas[batch_idx][key][frame_idx] for key in img_metas_keys}
-            #     img_metas_single_frame.append(img_metas_single_sample)            
+        
             # 1. Update the information of previous active tracks
             if prev_active_track_instances is None:
                 track_instances = self.generate_empty_instance()
@@ -214,9 +234,8 @@ class Fusion3DTracker(Cam3DTracker):
 
             # 2. PETR detection head
             out = self.pts_bbox_head(
-                img_feats[frame_idx], img_metas_single_frame, track_instances.query_feats,
+                fused_feats[frame_idx], img_metas_single_frame, track_instances.query_feats,
                 track_instances.query_embeds, track_instances.reference_points)
-            # breakpoint()
             # 3. Record the information into the track instances cache
             track_instances = self.load_detection_output_into_cache(track_instances, out)
             out['track_instances'] = track_instances
@@ -271,118 +290,168 @@ class Fusion3DTracker(Cam3DTracker):
         ]
         if self.tracking:
             bbox_results[0]['track_ids'] = [f'{self.runtime_tracker.current_seq}-{i}' for i in bbox_results[0]['track_ids'].long().cpu().numpy().tolist()]
-
-        results_list_3d = [InstanceData(metainfo=results) for results in bbox_results]
+        results_list_3d = []
+        for results in bbox_results:
+            instance = InstanceData()
+            # instance = InstanceData(metainfo=results)
+            instance.bboxes_3d = results['bboxes_3d']
+            instance.labels_3d = results['labels_3d']
+            instance.scores_3d = results['scores_3d']
+            instance.track_scores = results['track_scores']
+            instance.track_ids = results['track_ids']
+            results_list_3d.append(instance)
         detsamples = self.add_pred_to_datasample(
             data_samples[0], data_instances_3d=results_list_3d
         )
         return detsamples
 
-    def extract_clip_imgs_feats(self, img):
-        """Extract the features of multi-frame images
-        Args:
-            img_metas (list[dict], optional): Meta information of each sample.
-                For each sample, the format is Dict(key: contents of the timestamps)
-                Defaults to None. For each field, its shape is [T * NumCam * ContentLength]
-            img (torch.Tensor optional): Images of each sample with shape
-                (N, T, Num_Cam, C, H, W). Defaults to None.
-        Return:
-           img_feats (list[torch.Tensor]): List of features on every frame.
-        """
-        batch_size = len(img)
-        num_frame, num_cam = img[0].shape[0], img[0].shape[1]
 
-        # backbone images
-        # get all the images and let backbone infer for once
-        # all_imgs, all_img_metas = list(), list()
-        all_imgs = list()
-        dummy_img_metas = [dict() for _ in range(batch_size)] # metas not actually required to extract features
-        for frame_idx in range(num_frame):
+    def extract_clip_feats(self, inputs, data_samples):
+        outputs = list()
+        pts_clip = inputs['points']
+        num_frames = len(pts_clip)
+        batch_size = len(pts_clip[0])
+        img_clip = inputs.get('imgs', [None]*num_frames)
+        if self.batch_clip:
+            # put batched frames from clip into a single superbatch
             # single frame image, N * NumCam * C * H * W
-            img_single_frame = torch.stack([p[frame_idx] for p in img], dim=0)
-            all_imgs.append(img_single_frame)
-        # image metas
-        # img_metas_keys = img_metas[0].keys()
-        # for i in range(batch_size):
-        #     img_metas_single_sample = dict()
-        #     for key in img_metas_keys:
-        #         # join the fields of every timestamp
-        #         if type(img_metas[i][key][0]) == list:
-        #             contents = deepcopy(img_metas[i][key][0])
-        #             for j in range(1, num_frame):
-        #                 contents += img_metas[i][key][j]
-        #         # pick the representative one
-        #         else:
-        #             contents = deepcopy(img_metas[i][key][0])
-        #     img_metas_single_sample[key] = contents
-        #     all_img_metas.append(img_metas_single_sample)
+            if img_clip[0] is not None:
+                imgs_stacked = torch.cat([frame for frame in img_clip], dim=0)
+            else:
+                imgs_stacked = None
+            pts_stacked = []
+            input_metas = []
+            for pts_i, data_sample_i in zip(pts_clip, data_samples):
+                pts_stacked.extend(pts_i)
+                input_metas.extend([ds_batch.metainfo for ds_batch in data_sample_i])
+            # extract features from superbatch
+            input_dict = dict(imgs=imgs_stacked, points=pts_stacked)
+            fused_feats = self.extract_feat(input_dict, input_metas)
+            # extract output from superbatch back to clip
+            for frame_idx in range(num_frames):
+                outputs.append([fused_feats[0][frame_idx * batch_size:(frame_idx + 1) * batch_size]])
+        else:
+            # process each frame in clip separately
+            for frame_idx, (img_frame, pts_frame) in enumerate(zip(img_clip, pts_clip)):
+                input_dict = dict(imgs=img_frame, points=pts_frame)
+                # iterate over each item in batch for given frame_idx
+                input_metas = [item[frame_idx].metainfo for item in data_samples]
+                fused_feats = self.extract_feat(input_dict, input_metas)
+                outputs.append(fused_feats)
+        return outputs
 
-        # all imgs N * (T * NumCam) * C * H * W
-        all_imgs = torch.cat(all_imgs, dim=1)
-        # img_feats List[Tensor of batch 0, ...], each tensor BS * (T * NumCam) * C * H * W
-        all_img_feats = self.extract_feat(img=all_imgs, img_metas=dummy_img_metas)
+    def extract_feat(self, batch_inputs_dict, batch_input_metas):
+        imgs = batch_inputs_dict.get('imgs', None)
+        points = batch_inputs_dict.get('points', None)
+        features = []
+        if imgs is not None:
+            imgs = imgs.contiguous()
+            lidar2image, camera_intrinsics, camera2lidar = [], [], []
+            img_aug_matrix, lidar_aug_matrix = [], []
+            for i, meta in enumerate(batch_input_metas):
+                lidar2image.append(meta['lidar2img'])
+                camera_intrinsics.append(meta['cam2img'])
+                camera2lidar.append(meta['cam2lidar'])
+                num_cams = len(meta['cam2img'])
+                img_aug_matrix.append(
+                    meta.get('img_aug_matrix', 
+                             np.vstack([np.eye(4)]*num_cams).reshape(num_cams, 4, 4)))
+                lidar_aug_matrix.append(
+                    meta.get('lidar_aug_matrix', np.eye(4)))
 
-        # per frame feature maps
-        img_feats = list()
-        for i in range(num_frame):
-            single_frame_feats = [lvl_feats[:, num_cam * i: num_cam * (i + 1), :, :, :] for lvl_feats in all_img_feats]
-            img_feats.append(single_frame_feats)
-        return img_feats
+            lidar2image = imgs.new_tensor(np.asarray(lidar2image))
+            camera_intrinsics = imgs.new_tensor(np.array(camera_intrinsics))
+            camera2lidar = imgs.new_tensor(np.asarray(camera2lidar))
+            img_aug_matrix = imgs.new_tensor(np.asarray(img_aug_matrix))
+            lidar_aug_matrix = imgs.new_tensor(np.asarray(lidar_aug_matrix))
+            img_feature = self.extract_img_feat(imgs, deepcopy(points),
+                                                lidar2image, camera_intrinsics,
+                                                camera2lidar, img_aug_matrix,
+                                                lidar_aug_matrix,
+                                                batch_input_metas)
+            features.append(img_feature)
+        pts_feature = self.extract_pts_feat(batch_inputs_dict)
+        features.append(pts_feature)
+
+        if self.with_fusion:
+            x = self.fusion_layer(features)
+        else:
+            assert len(features) == 1, features
+            x = features[0]
+
+        x = self.pts_backbone(x)
+        x = self.pts_neck(x)
+        return x
+
+    def extract_img_feat(
+        self,
+        x,
+        points,
+        lidar2image,
+        camera_intrinsics,
+        camera2lidar,
+        img_aug_matrix,
+        lidar_aug_matrix,
+        img_metas,
+    ) -> torch.Tensor:
+        B, N, C, H, W = x.size()
+        x = x.view(B * N, C, H, W).contiguous()
+
+        x = self.img_backbone(x)
+        x = self.img_neck(x)
+
+        if not isinstance(x, torch.Tensor):
+            x = x[0]
+
+        BN, C, H, W = x.size()
+        x = x.view(B, int(BN / B), C, H, W)
+
+        with torch.autocast(device_type='cuda', dtype=torch.float32):
+            x = self.view_transform(
+                x,
+                points,
+                lidar2image,
+                camera_intrinsics,
+                camera2lidar,
+                img_aug_matrix,
+                lidar_aug_matrix,
+                img_metas,
+            )
+        return x
     
-    def init_params_and_layers(self):
-        """Generate the instances for tracking, especially the object queries
-        """
-        # query initialization for detection
-        # reference points, mapping fourier encoding to embed_dims
-        self.reference_points = nn.Embedding(self.num_query, 3)
-        self.query_embedding = nn.Sequential(
-            nn.Linear(self.embed_dims*3//2, self.embed_dims),
-            nn.ReLU(),
-            nn.Linear(self.embed_dims, self.embed_dims),
-        )
-        nn.init.uniform_(self.reference_points.weight.data, 0, 1)
+    def extract_pts_feat(self, batch_inputs_dict) -> torch.Tensor:
+        points = batch_inputs_dict['points']
+        with torch.autocast('cuda', enabled=False):
+            points = [point.float() for point in points]
+            feats, coords, sizes = self.voxelize(points)
+            batch_size = coords[-1, 0] + 1
+        x = self.pts_middle_encoder(feats, coords, batch_size)
+        return x
 
-        # embedding initialization for tracking
-        if self.tracking:
-            self.query_feat_embedding = nn.Embedding(self.num_query, self.embed_dims)
-            nn.init.zeros_(self.query_feat_embedding.weight)
-        
-        # freeze backbone
-        if not self.train_backbone:
-            for param in self.img_backbone.parameters():
-                param.requires_grad = False
-        return
+    @torch.no_grad()
+    def voxelize(self, points):
+        feats, coords, sizes = [], [], []
+        for k, res in enumerate(points):
+            ret = self.pts_voxel_layer(res)
+            if len(ret) == 3:
+                # hard voxelize
+                f, c, n = ret
+            else:
+                assert len(ret) == 2
+                f, c = ret
+                n = None
+            feats.append(f)
+            coords.append(F.pad(c, (1, 0), mode='constant', value=k))
+            if n is not None:
+                sizes.append(n)
 
+        feats = torch.cat(feats, dim=0)
+        coords = torch.cat(coords, dim=0)
+        if len(sizes) > 0:
+            sizes = torch.cat(sizes, dim=0)
+            if self.voxelize_reduce:
+                feats = feats.sum(
+                    dim=1, keepdim=False) / sizes.type_as(feats).view(-1, 1)
+                feats = feats.contiguous()
 
-def track_bbox3d2result(bboxes, scores, labels, obj_idxes, track_scores, forecasting=None, attrs=None):
-    """Convert detection results to a list of numpy arrays.
-    Args:
-        bboxes (torch.Tensor): Bounding boxes with shape of (n, 5).
-        labels (torch.Tensor): Labels with shape of (n, ).
-        scores (torch.Tensor): Scores with shape of (n, ).
-        forecasting (torch.Tensor): Motion forecasting with shape of (n, T, 2)
-        attrs (torch.Tensor, optional): Attributes with shape of (n, ). \
-            Defaults to None.
-    Returns:
-        dict[str, torch.Tensor]: Bounding box results in cpu mode.
-            - boxes_3d (torch.Tensor): 3D boxes.
-            - scores (torch.Tensor): Prediction scores.
-            - labels_3d (torch.Tensor): Box labels.
-            - attrs_3d (torch.Tensor, optional): Box attributes.
-            - forecasting (torh.Tensor, optional): Motion forecasting
-    """
-    result_dict = dict(
-        bboxes_3d=bboxes.to('cpu'),
-        scores_3d=scores.cpu(),
-        labels_3d=labels.cpu(),
-        track_scores=track_scores.cpu(),
-        track_ids=obj_idxes.cpu(),
-    )
-
-    if attrs is not None:
-        result_dict['attrs_3d'] = attrs.cpu()
-    
-    if forecasting is not None:
-        result_dict['forecasting'] = forecasting.cpu()[..., :2]
-
-    return result_dict
+        return feats, coords, sizes
