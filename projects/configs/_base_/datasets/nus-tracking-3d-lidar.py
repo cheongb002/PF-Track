@@ -120,23 +120,6 @@ test_pipeline_multiframe = [
         ])
 ]
 
-# construct a pipeline for data and gt loading in show function
-# please keep its loading function consistent with test_pipeline (e.g. client)
-eval_pipeline = [
-    dict(
-        type='LoadPointsFromFile',
-        coord_type='LIDAR',
-        load_dim=5,
-        use_dim=5,
-        backend_args=backend_args),
-    dict(
-        type='LoadPointsFromMultiSweeps',
-        sweeps_num=10,
-        test_mode=True,
-        backend_args=backend_args),
-    dict(type='Pack3DDetInputs', keys=['points'])
-]
-
 train_dataloader = dict(
     batch_size=1,
     num_workers=4,

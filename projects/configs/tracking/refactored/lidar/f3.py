@@ -10,16 +10,6 @@ train_dataloader = dict(
         )
     )
 )
-test_dataloader = dict(
-    dataset=dict(
-        num_frames_per_sample=num_frames_per_sample,
-    )
-)
-val_dataloader = dict(
-    dataset=dict(
-        num_frames_per_sample=num_frames_per_sample,
-    )
-)
 
 model = dict(
     tracking=True,
@@ -43,7 +33,7 @@ model = dict(
     ),
 )
 
-val_evaluator = dict(
-    type='NuScenesTrackingMetric'
-)
+val_evaluator = dict(type='NuScenesTrackingMetric')
+test_evaluator = dict(type='NuScenesTrackingMetric')
+
 load_from = 'work_dirs/refactored/lidar/f1_q500_800x320-mini/iou/epoch_200.pth'

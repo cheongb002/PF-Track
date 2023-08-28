@@ -30,25 +30,6 @@ plugin_dir = 'projects/'
 
 file_client_args = dict(backend='disk')
 
-num_frames_per_sample = 1 # how many frames to train on
-train_dataloader = dict(
-    dataset=dict(
-        dataset=dict(
-            num_frames_per_sample=num_frames_per_sample,
-        )
-    )
-)
-test_dataloader = dict(
-    dataset=dict(
-        num_frames_per_sample=num_frames_per_sample,
-    )
-)
-val_dataloader = dict(
-    dataset=dict(
-        num_frames_per_sample=num_frames_per_sample,
-    )
-)
-
 # optimizer
 lr = 2e-4  # max learning rate
 optim_wrapper = dict(
@@ -120,3 +101,5 @@ resume_from=None
 default_hooks=dict(
     logger=dict(interval=100)
 )
+
+randomness = dict(seed=1792775515)
