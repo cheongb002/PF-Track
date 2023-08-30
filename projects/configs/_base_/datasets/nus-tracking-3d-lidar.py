@@ -1,6 +1,6 @@
 # If point cloud range is changed, the models should also change their point
 # cloud range accordingly
-point_cloud_range = [-50, -50, -5, 50, 50, 3]
+point_cloud_range = [-54.0, -54.0, -5.0, 54.0, 54.0, 3.0]
 # Using calibration info convert the Lidar-coordinate point cloud range to the
 # ego-coordinate point cloud range could bring a little promotion in nuScenes.
 # point_cloud_range = [-50, -50.8, -5, 50, 49.2, 3]

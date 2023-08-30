@@ -25,31 +25,13 @@ class TrackingLossCombo(TrackingLoss):
     """ Tracking loss with reference point supervision
     """
     def __init__(self,
-                 num_classes,
-                 code_weights=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.2, 0.2],
-                 sync_cls_avg_factor=False,
-                 interm_loss=True,
-                 loss_cls=dict(
-                    type='FocalLoss',
-                    use_sigmoid=True,
-                    gamma=2.0,
-                    alpha=0.25,
-                    loss_weight=2.0),
-                 loss_bbox=dict(type='L1Loss', loss_weight=0.25),
-                 loss_iou=dict(type='GIoULoss', loss_weight=0.0),
+                 *args,
                  loss_prediction=dict(type='L1Loss', loss_weight=1.0),
-                 assigner=dict(
-                    type='HungarianAssigner3D',
-                    cls_cost=dict(type='FocalLossCost', weight=2.0),
-                    reg_cost=dict(type='BBox3DL1Cost', weight=0.25),
-                    iou_cost=dict(type='IoUCost', weight=0.0), # Fake cost. This is just to make it compatible with DETR head. 
-                    pc_range=[-51.2, -51.2, -5.0, 51.2, 51.2, 3.0])):
+                **kwargs):
 
-        super(TrackingLoss, self).__init__(
-            num_classes, code_weights, sync_cls_avg_factor, interm_loss,
-            loss_cls, loss_bbox, loss_iou, assigner)
+        super(TrackingLoss, self).__init__(*args, **kwargs)
         self.loss_traj = MODELS.build(loss_prediction)
-        self.loss_mem_cls = MODELS.build(loss_cls)
+        self.loss_mem_cls = self.loss_cls
         # self.loc_refine_code_weights = [1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         self.loc_refine_code_weights = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.2, 0.2]
     

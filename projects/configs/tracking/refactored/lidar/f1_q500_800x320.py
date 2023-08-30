@@ -8,7 +8,7 @@ custom_imports = dict(imports=['projects.BEVFusion.bevfusion'], allow_failed_imp
 custom_imports = dict(imports=['projects.tracking_plugin'], allow_failed_imports=False)
 
 
-point_cloud_range = [-54.0, -54.0, -5.0, 54.0, 54.0, 3.0]
+point_cloud_range = [-54.0, -54.0, -5.0, 54.0, 54.0, 3.0] # from nuscenes config
 model = dict(
     train_backbone=False,
     voxelize_cfg=dict(point_cloud_range=point_cloud_range),
@@ -20,6 +20,7 @@ model = dict(
             point_cloud_range=point_cloud_range,
             assigner=dict(pc_range=point_cloud_range)
         ),
+        dataset='nuScenes'
     ),
     loss=dict(assigner=dict(pc_range=point_cloud_range)),
 )

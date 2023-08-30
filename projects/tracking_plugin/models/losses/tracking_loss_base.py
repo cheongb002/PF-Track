@@ -13,8 +13,7 @@
 
 import torch
 import torch.nn as nn
-from mmdet3d.registry import MODELS
-from mmdet.models.task_modules import build_assigner, build_sampler
+from mmdet3d.registry import MODELS, TASK_UTILS
 from mmdet.models.utils.misc import multi_apply
 from mmdet.utils.dist_utils import reduce_mean
 from mmengine.structures import InstanceData
@@ -49,12 +48,12 @@ class TrackingLossBase(nn.Module):
         super().__init__()
         self.num_classes = num_classes
         self.interm_loss = interm_loss # if compute separate losses for all the decoders
-        self.assigner = build_assigner(assigner)
+        self.assigner = TASK_UTILS.build(assigner)
         self.loss_cls = MODELS.build(loss_cls)
         self.loss_bbox = MODELS.build(loss_bbox)
         self.loss_iou = MODELS.build(loss_iou)
         sampler_cfg = dict(type='PseudoSampler')
-        self.sampler = build_sampler(sampler_cfg, context=self)
+        self.sampler = TASK_UTILS.build(sampler_cfg, context=self)
 
         self.pc_range = self.assigner.pc_range
 

@@ -5,6 +5,7 @@
 # Copyright (c) 2022 megvii-model. All Rights Reserved.
 # ------------------------------------------------------------------------
 import torch
+from mmdet3d.models import draw_heatmap_gaussian, gaussian_radius
 from mmdet3d.registry import MODELS
 from mmdet.models.utils import multi_apply
 
@@ -15,10 +16,22 @@ from .tracking_loss_base import TrackingLossBase
 class TrackingLoss(TrackingLossBase):
     def __init__(self,
                  *args,
+                 loss_heatmap:dict=dict(
+                        type='mmdet.GaussianFocalLoss',
+                        reduction='mean',
+                        loss_weight=1.0
+                 ),
+                 gaussian_overlap:float=0.1,
+                 min_gauss_radius:int=2,
                  **kwargs):
-
         super().__init__(*args, **kwargs)
-    
+        self.loss_heatmap = MODELS.build(loss_heatmap)
+        self.gaussian_overlap = gaussian_overlap
+        self.min_gauss_radius = min_gauss_radius
+        self.pc_width_x = self.pc_range[3] - self.pc_range[0]
+        self.pc_height_y = self.pc_range[4] - self.pc_range[1]
+
+
     def loss_single_frame(self,
                           frame_idx,
                           gt_bboxes_list,
@@ -182,4 +195,37 @@ class TrackingLoss(TrackingLossBase):
             loss_dict[f'f{frame_idx}.d{num_dec_layer}.matched_iou'] = matched_ious_i
             num_dec_layer += 1
 
+        # step 8. compute the heatmap loss
+        if preds_dicts.get('dense_heatmap', None) is not None:
+            pred_heatmaps = preds_dicts['heatmaps']
+            gt_heatmaps = self.get_heatmap_targets(gt_bboxes_list, gt_labels_list, pred_heatmaps)
+            heatmaps_loss = self.loss_heatmap(
+                pred_heatmaps.sigmoid(), 
+                gt_heatmaps,
+                avg_factor=max(gt_heatmaps.eq(1).float().sum().item(), 1))
+            loss_dict[f'f{frame_idx}.loss_heatmap'] = heatmaps_loss
+
         return loss_dict
+
+    def get_heatmap_targets(self, gt_bboxes_list, gt_labels_list, pred_heatmaps):
+        breakpoint()
+        heatmap_size = pred_heatmaps.size()[-2:]
+        gt_heatmap = torch.zeros((self.num_classes, heatmap_size[1], heatmap_size[0]))
+        for idx, (bbox, label) in enumerate(zip(gt_bboxes_list, gt_labels_list)):
+            width, length = bbox[3:5]
+            if width <= 0 or length <= 0:
+                continue
+            # convert to global coords to feature coords
+            width *= heatmap_size[0] / self.pc_width_x 
+            length *= heatmap_size[1] / self.pc_height_y 
+            radius = gaussian_radius((length, width), min_overlap=self.gaussian_overlap)
+            radius = max(self.min_gauss_radius, int(radius))
+            # convert from global coords to feature coords
+            x, y = bbox[0:2]
+            coor_x = (x - self.pc_range[0]) * heatmap_size[0] / self.pc_width_x
+            coor_y = (y - self.pc_range[1]) * heatmap_size[1] / self.pc_height_y
+            # draw_heatmap_gaussian expects the center coords to be y, x
+            center = torch.tensor([coor_y, coor_x])
+            center_int = center.to(torch.int32)
+            draw_heatmap_gaussian(gt_heatmap[label], center_int, radius)
+        return gt_heatmap
