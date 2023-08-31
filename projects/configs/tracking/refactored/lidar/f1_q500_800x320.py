@@ -91,7 +91,7 @@ param_scheduler = [
         by_epoch=True,
         convert_to_iter_based=True)
 ]
-train_cfg = dict(max_epochs=num_epochs, val_interval=2)
+train_cfg = dict(max_epochs=num_epochs, val_interval=4)
 find_unused_parameters=True
 
 load_from='ckpts/BEVFusion/lidar/epoch_20.pth'
