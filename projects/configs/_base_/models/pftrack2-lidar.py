@@ -16,9 +16,10 @@ model = dict(
         voxel_size=voxel_size,
         max_voxels=[120000, 160000]),
     voxelize_reduce=True,
+    feat_channels=512,
+    hidden_channel=256,
     # heatmap param
     heatmap_query_init=True,
-    heatmap_hidden_channel=128,
     heatmap_nms_kernel=3,
     # PF-Track params
     tracking=False,
@@ -149,7 +150,7 @@ model = dict(
     pts_bbox_head=dict(
         type='BEVFusionTrackingHead',
         num_classes=10,
-        in_channels=512,
+        in_channels=256,
         LID=True,
         with_position=True,
         with_multiview=True,
@@ -193,15 +194,15 @@ model = dict(
         positional_encoding=dict(
             # type='mmdet.LearnedPositionalEncoding', num_feats=128, normalize=True),
             type='mmdet.SinePositionalEncoding', num_feats=128, normalize=True),
+    ),
     # model training and testing settings
     test_cfg=dict(
-        pts=dict(
-            grid_size=[1440, 1440, 41], # pc_range/voxel_size
-            voxel_size=voxel_size,
-            # point_cloud_range=point_cloud_range, # determined by dataset
-            out_size_factor=8, # grid_size/feature_map_size
-            ),
-        ),
+        pts=None, # requured by mvx_two_stage
+        grid_size=[1440, 1440, 41], # pc_range/voxel_size
+        voxel_size=voxel_size,
+        # point_cloud_range=point_cloud_range, # determined by dataset
+        out_size_factor=8, # grid_size/feature_map_size
+    ),
     loss=dict(
         type='TrackingLossCombo',
         num_classes=10,
@@ -227,4 +228,6 @@ model = dict(
             iou_cost=dict(type='IoUCost', weight=0.0), # Fake cost. This is just to make it compatible with DETR head. 
             iou_calculator=dict(type='BboxOverlaps3D', coordinate='lidar'),
             # pc_range=point_cloud_range
-            )))
+        )
+    )
+)

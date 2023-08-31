@@ -197,8 +197,13 @@ class TrackingLoss(TrackingLossBase):
 
         # step 8. compute the heatmap loss
         if preds_dicts.get('dense_heatmap', None) is not None:
-            pred_heatmaps = preds_dicts['heatmaps']
-            gt_heatmaps = self.get_heatmap_targets(gt_bboxes_list, gt_labels_list, pred_heatmaps)
+            pred_heatmaps = preds_dicts['dense_heatmap']
+            gt_heatmaps = []
+            # iterate over batch
+            for batch_idx, (gt_bbox, gt_labels, pred_heatmap) in enumerate(zip(gt_bboxes_list, gt_labels_list, pred_heatmaps)):
+                gt_heatmap = self.get_heatmap_targets(gt_bbox, gt_labels, pred_heatmap)
+                gt_heatmaps.append(gt_heatmap)
+            gt_heatmaps = torch.stack(gt_heatmaps, dim=0)
             heatmaps_loss = self.loss_heatmap(
                 pred_heatmaps.sigmoid(), 
                 gt_heatmaps,
@@ -208,10 +213,9 @@ class TrackingLoss(TrackingLossBase):
         return loss_dict
 
     def get_heatmap_targets(self, gt_bboxes_list, gt_labels_list, pred_heatmaps):
-        breakpoint()
-        heatmap_size = pred_heatmaps.size()[-2:]
-        gt_heatmap = torch.zeros((self.num_classes, heatmap_size[1], heatmap_size[0]))
-        for idx, (bbox, label) in enumerate(zip(gt_bboxes_list, gt_labels_list)):
+        heatmap_size = pred_heatmaps.shape[-2:]
+        gt_heatmap = pred_heatmaps.new_zeros((self.num_classes, heatmap_size[1], heatmap_size[0]))
+        for gt_idx, (bbox, label) in enumerate(zip(gt_bboxes_list, gt_labels_list)):
             width, length = bbox[3:5]
             if width <= 0 or length <= 0:
                 continue

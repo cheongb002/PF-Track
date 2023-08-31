@@ -35,5 +35,4 @@ model = dict(
 
 val_evaluator = dict(type='NuScenesTrackingMetric')
 test_evaluator = dict(type='NuScenesTrackingMetric')
-
 load_from = 'work_dirs/refactored/lidar/f1_q500_800x320-mini/iou/epoch_200.pth'

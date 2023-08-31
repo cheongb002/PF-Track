@@ -15,11 +15,8 @@ model = dict(
     pc_range = point_cloud_range,
     spatial_temporal_reason=dict(pc_range=point_cloud_range),
     pts_bbox_head=dict(bbox_coder=dict(pc_range=point_cloud_range)),
-    train_cfg=dict(
-        pts=dict(
-            point_cloud_range=point_cloud_range,
-            assigner=dict(pc_range=point_cloud_range)
-        ),
+    test_cfg=dict(
+        point_cloud_range=point_cloud_range,
         dataset='nuScenes'
     ),
     loss=dict(assigner=dict(pc_range=point_cloud_range)),

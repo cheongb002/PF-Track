@@ -28,11 +28,12 @@ class Fusion3DTracker(Cam3DTracker):
             *args, 
             voxelize_cfg:dict, 
             voxelize_reduce:bool,
+            feat_channels:int=512, # lidar backbone output
+            hidden_channel:int=128,
             view_transform:Optional[dict]=None,
             fusion_layer:Optional[dict]=None,
             batch_clip:bool=True,
             heatmap_query_init:bool=False,
-            heatmap_hidden_channel:int=128,
             heatmap_nms_kernel:int=3,
             **kwargs
         ):
@@ -69,13 +70,22 @@ class Fusion3DTracker(Cam3DTracker):
                 for param in self.fusion_layer.parameters():
                     param.requires_grad = False
 
+        # to go from input to the hidden channel
+        self.shared_conv = build_conv_layer(
+            dict(type='Conv2d'),
+            feat_channels, # 512
+            hidden_channel, # 128
+            kernel_size=3,
+            padding=1,
+            bias='auto',
+        )
         self.heatmap_query_init = heatmap_query_init
         if self.heatmap_query_init:
             layers = []
             layers.append(
                 ConvModule(
-                    heatmap_hidden_channel,
-                    heatmap_hidden_channel,
+                    hidden_channel,
+                    hidden_channel,
                     kernel_size=3,
                     padding=1,
                     bias='auto',
@@ -85,14 +95,14 @@ class Fusion3DTracker(Cam3DTracker):
             layers.append(
                 build_conv_layer(
                     dict(type='Conv2d'),
-                    heatmap_hidden_channel,
+                    hidden_channel,
                     self.num_classes,
                     kernel_size=3,
                     padding=1,
                     bias='auto',
                 ))
             self.heatmap_head = nn.Sequential(*layers)
-            self.class_encoding = nn.Conv1d(self.num_classes, heatmap_hidden_channel, 1)
+            self.class_encoding = nn.Conv1d(self.num_classes, hidden_channel, 1)
             self.nms_kernel = heatmap_nms_kernel
             # x_size, y_size of feature map
             x_size = self.test_cfg['grid_size'][0] // self.test_cfg['out_size_factor']
@@ -401,7 +411,7 @@ class Fusion3DTracker(Cam3DTracker):
             fused_feats = self.extract_feat(input_dict, input_metas)
             # extract output from superbatch back to clip
             for frame_idx in range(num_frames):
-                outputs.append([fused_feats[0][frame_idx * batch_size:(frame_idx + 1) * batch_size]])
+                outputs.append(fused_feats[frame_idx * batch_size:(frame_idx + 1) * batch_size])
         else:
             # process each frame in clip separately
             for frame_idx, (img_frame, pts_frame) in enumerate(zip(img_clip, pts_clip)):
@@ -453,6 +463,7 @@ class Fusion3DTracker(Cam3DTracker):
 
         x = self.pts_backbone(x)
         x = self.pts_neck(x)
+        x = self.shared_conv(x[0])
         return x
 
     def extract_img_feat(
@@ -534,11 +545,13 @@ class Fusion3DTracker(Cam3DTracker):
         batch_size = fused_feat.shape[0]
         fused_feat_flatten = fused_feat.view(batch_size, fused_feat.shape[1], -1) # [B, C, H*W]
         dense_heatmap = self.heatmap_head(fused_feat)
+        # technically sigmoid here is optional since we only use the max value.
+        # sigmoid is applied again in the loss computation
         heatmap = dense_heatmap.detach().sigmoid()
-        padding = self.nms_kernel_size // 2
+        padding = self.nms_kernel // 2
         local_max = torch.zeros_like(heatmap)
         local_max_inner = F.max_pool2d(
-            heatmap, kernel_size=self.nms_kernel_size, stride=1, padding=0)
+            heatmap, kernel_size=self.nms_kernel, stride=1, padding=0)
         local_max[:, :, padding:(-padding),
                   padding:(-padding)] = local_max_inner
 
@@ -587,9 +600,11 @@ class Fusion3DTracker(Cam3DTracker):
         )
 
         """Detection queries"""
-        empty_track_instances.reference_points = query_pos.clone()
-        empty_track_instances.query_feats = query_feat.clone()
-        empty_track_instances.query_embeds = self.query_embedding(pos2posemb3d(query_pos))
+        # remove batch dim
+        empty_track_instances.reference_points = query_pos[0].clone()
+        # convert query_feat from [C, num_query] to [num_query, C]
+        empty_track_instances.query_feats = query_feat[0].clone().permute(1, 0)
+        empty_track_instances.query_embeds = self.query_embedding(pos2posemb3d(query_pos[0]))
         """Cache for current frame information, loading temporary data for spatial-temporal reasoning"""
         empty_track_instances.cache_reference_points = empty_track_instances.reference_points.clone()
         empty_track_instances.cache_query_embeds = empty_track_instances.query_embeds.clone()

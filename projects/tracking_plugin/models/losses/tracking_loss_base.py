@@ -53,7 +53,7 @@ class TrackingLossBase(nn.Module):
         self.loss_bbox = MODELS.build(loss_bbox)
         self.loss_iou = MODELS.build(loss_iou)
         sampler_cfg = dict(type='PseudoSampler')
-        self.sampler = TASK_UTILS.build(sampler_cfg, context=self)
+        self.sampler = TASK_UTILS.build(sampler_cfg)
 
         self.pc_range = self.assigner.pc_range
 

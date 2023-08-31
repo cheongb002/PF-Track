@@ -29,7 +29,7 @@ class TrackingLossCombo(TrackingLoss):
                  loss_prediction=dict(type='L1Loss', loss_weight=1.0),
                 **kwargs):
 
-        super(TrackingLoss, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.loss_traj = MODELS.build(loss_prediction)
         self.loss_mem_cls = self.loss_cls
         # self.loc_refine_code_weights = [1.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0]
