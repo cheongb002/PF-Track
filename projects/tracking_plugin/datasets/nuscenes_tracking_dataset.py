@@ -53,6 +53,9 @@ class NuScenesTrackingDataset(NuScenesDataset):
         ann_info = input_dict['ann_info'] if not self.test_mode \
             else input_dict['eval_ann_info']
         if self.filter_empty_gt and (~(ann_info['gt_labels_3d'] != -1).any()):
+            print("self.filter_empty_gt and (~(ann_info['gt_labels_3d'] != -1).any())")
+            print('self.filter_empty_gt', self.filter_empty_gt)
+            print(ann_info['gt_labels_3d'])
             return None
         scene_token = input_dict['scene_token']
         data_queue = [input_dict]
@@ -62,11 +65,17 @@ class NuScenesTrackingDataset(NuScenesDataset):
         for i in index_list[1:]:
             data_info_i = self._prepare_data_single(i)
             if data_info_i is None or data_info_i['scene_token'] != scene_token:
+                print("data_info_i is None or data_info_i['scene_token'] != scene_token")
+                print("data_info_i is None: ", data_info_i is None)
+                print("data_info_i['scene_token'] != scene_token: ", data_info_i['scene_token'] != scene_token)
                 return None
             ann_info = data_info_i['ann_info'] if not self.test_mode \
                 else data_info_i['eval_ann_info']
             if self.filter_empty_gt and ~(ann_info['gt_labels_3d'] != -1).any() and not self.test_mode:
-                print("filter empty gt in index")
+                print("self.filter_empty_gt and ~(ann_info['gt_labels_3d'] != -1).any() and not self.test_mode")
+                print('self.filter_empty_gt', self.filter_empty_gt)
+                print('~(ann_info[\'gt_labels_3d\'] != -1).any()', ~(ann_info['gt_labels_3d'] != -1).any())
+                print('not self.test_mode', not self.test_mode)
                 return None
             data_queue.append(data_info_i)
 
@@ -111,7 +120,9 @@ class NuScenesTrackingDataset(NuScenesDataset):
             # return None to random another in `__getitem__`
             if example is None or len(
                     example['gt_bboxes_3d']) == 0:
-                print("filter empty gt in prepare data or example is None")
+                print("example is None or len(example['gt_bboxes_3d']) == 0")
+                print("example is None: ", example is None)
+                print("len(example['gt_bboxes_3d']) == 0: ", len(example['gt_bboxes_3d']) == 0)
                 return None
 
         if self.show_ins_var:

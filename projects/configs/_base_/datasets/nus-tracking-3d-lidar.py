@@ -143,6 +143,7 @@ train_dataloader = dict(
             # and box_type_3d='Depth' in sunrgbd and scannet dataset.
             use_valid_flag=True,
             box_type_3d='LiDAR',
+            filter_empty_gt=False,
             backend_args=backend_args
         )
     )
@@ -165,6 +166,7 @@ test_dataloader = dict(
         data_prefix=data_prefix,
         test_mode=True,
         box_type_3d='LiDAR',
+        filter_empty_gt=False,
         backend_args=backend_args))
 val_dataloader = dict(
     batch_size=1,
@@ -184,6 +186,7 @@ val_dataloader = dict(
         test_mode=True,
         data_prefix=data_prefix,
         box_type_3d='LiDAR',
+        filter_empty_gt=False,
         backend_args=backend_args))
 
 val_evaluator = dict(
