@@ -67,7 +67,8 @@ class NuScenesTrackingDataset(NuScenesDataset):
             if data_info_i is None or data_info_i['scene_token'] != scene_token:
                 print("data_info_i is None or data_info_i['scene_token'] != scene_token")
                 print("data_info_i is None: ", data_info_i is None)
-                print("data_info_i['scene_token'] != scene_token: ", data_info_i['scene_token'] != scene_token)
+                if data_info_i is not None:
+                    print("data_info_i['scene_token'] != scene_token: ", data_info_i['scene_token'] != scene_token)
                 return None
             ann_info = data_info_i['ann_info'] if not self.test_mode \
                 else data_info_i['eval_ann_info']
