@@ -143,7 +143,7 @@ train_dataloader = dict(
             # and box_type_3d='Depth' in sunrgbd and scannet dataset.
             use_valid_flag=True,
             box_type_3d='LiDAR',
-            filter_empty_gt=False,
+            filter_empty_gt=True,
             backend_args=backend_args
         )
     )
