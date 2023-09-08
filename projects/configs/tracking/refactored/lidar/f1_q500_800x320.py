@@ -28,8 +28,8 @@ plugin_dir = 'projects/'
 
 file_client_args = dict(backend='disk')
 
-# optimizer
-lr = 2e-4  # max learning rate
+num_epochs = 20
+lr = 1e-5
 optim_wrapper = dict(
     type='OptimWrapper',
     optimizer=dict(
@@ -43,13 +43,6 @@ optim_wrapper = dict(
         # pts_neck=dict(lr_mult=0.1),
         ))
 )
-
-num_epochs = 20
-lr = 5e-5
-optim_wrapper = dict(
-    type='OptimWrapper',
-    optimizer=dict(type='AdamW', lr=lr, weight_decay=0.01),
-    clip_grad=dict(max_norm=35, norm_type=2))
 param_scheduler = [
     # learning rate scheduler
     # During the first 8 epochs, learning rate increases from 0 to lr * 10
