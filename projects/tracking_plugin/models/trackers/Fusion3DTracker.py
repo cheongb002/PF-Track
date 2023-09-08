@@ -462,8 +462,8 @@ class Fusion3DTracker(Cam3DTracker):
             x = features[0]
 
         x = self.pts_backbone(x)
-        x = self.pts_neck(x)
-        x = self.shared_conv(x[0])
+        x = self.pts_neck(x)[0]
+        x = self.shared_conv(x)
         return x
 
     def extract_img_feat(
