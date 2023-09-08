@@ -19,7 +19,7 @@ model = dict(
     motion_prediction_ref_update=True,
     runtime_tracker=dict(
         output_threshold=0.2,
-        score_threshold=0.2,
+        score_threshold=0.4,
         record_threshold=0.4,
         max_age_since_update=7,
     ),
@@ -35,4 +35,4 @@ model = dict(
 
 val_evaluator = dict(type='NuScenesTrackingMetric')
 test_evaluator = dict(type='NuScenesTrackingMetric')
-load_from = 'work_dirs/refactored/lidar/f1_q500_800x320-mini/iou/epoch_200.pth'
+load_from = 'ckpts/f1_heatmap/epoch_20.pth'
