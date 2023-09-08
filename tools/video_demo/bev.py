@@ -109,7 +109,7 @@ def main():
         
         frame_results = results[sample_token]
         for i, box in enumerate(frame_results):
-            if box['detection_score'] < 0.4:
+            if box['tracking_score'] < 0.4:
                 continue
             nusc_box = Box(box['translation'], box['size'], Quaternion(box['rotation']))
             mot_bbox = BBox(
@@ -117,7 +117,7 @@ def main():
                 w=nusc_box.wlh[0], l=nusc_box.wlh[1], h=nusc_box.wlh[2],
                 o=nusc_box.orientation.yaw_pitch_roll[0]
             )
-            track_id = 0 # int(box['tracking_id'].split('-')[-1])
+            track_id = int(box['tracking_id'].split('-')[-1])
             color = COLOR_KEYS[track_id % len(COLOR_KEYS)]
             visualizer.handler_box(mot_bbox, message='', color=color)
             # visualizer.handler_box(mot_bbox, message=box['tracking_id'].split('-')[-1], color=color)
@@ -126,7 +126,7 @@ def main():
         all_trajs = list()
         color_list = list()
         for i, box in enumerate(frame_results):
-            if box['detection_score'] < 0.4:
+            if box['tracking_score'] < 0.4:
                 continue
             if 'forecasting' in box.keys() and box['forecasting'] is not None:
                 # traj [T * 2]
@@ -137,7 +137,7 @@ def main():
                 traj += np.array(box['translation'])[:2]
                 all_trajs.append(traj[np.newaxis, ...])
 
-                track_id = 0 # int(box['tracking_id'].split('-')[-1])
+                track_id = int(box['tracking_id'].split('-')[-1])
                 color = visualizer.COLOR_MAP[COLOR_KEYS[track_id % len(COLOR_KEYS)]]
                 color_list.append(color)
 

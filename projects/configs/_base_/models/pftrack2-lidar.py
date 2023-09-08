@@ -9,12 +9,19 @@ model = dict(
         std=[57.375, 57.120, 58.395],
         bgr_to_rgb=False,
         pad_size_divisor=32),
+    # lidar params
     voxelize_cfg=dict(
         max_num_points=10,
         # point_cloud_range=[-54.0, -54.0, -5.0, 54.0, 54.0, 3.0],
         voxel_size=voxel_size,
         max_voxels=[120000, 160000]),
     voxelize_reduce=True,
+    feat_channels=512,
+    hidden_channel=256,
+    # heatmap param
+    heatmap_query_init=True,
+    heatmap_nms_kernel=3,
+    # PF-Track params
     tracking=False,
     train_backbone=True,
     use_grid_mask=True,
@@ -143,7 +150,7 @@ model = dict(
     pts_bbox_head=dict(
         type='BEVFusionTrackingHead',
         num_classes=10,
-        in_channels=512,
+        in_channels=256,
         LID=True,
         with_position=True,
         with_multiview=True,
@@ -187,31 +194,15 @@ model = dict(
         positional_encoding=dict(
             # type='mmdet.LearnedPositionalEncoding', num_feats=128, normalize=True),
             type='mmdet.SinePositionalEncoding', num_feats=128, normalize=True),
-        loss_cls=dict(
-            type='mmdet.FocalLoss',
-            use_sigmoid=True,
-            gamma=2.0,
-            alpha=0.25,
-            loss_weight=2.0),
-        loss_bbox=dict(type='mmdet.L1Loss', loss_weight=0.25),
-        loss_iou=dict(type='mmdet.GIoULoss', loss_weight=0.0)),
+    ),
     # model training and testing settings
-    train_cfg=dict(
-        pts=dict(
-            grid_size=[1440, 1440, 41],
-            voxel_size=voxel_size,
-            # point_cloud_range=point_cloud_range,
-            out_size_factor=4,
-            assigner=dict(
-                type='HungarianAssigner3D',
-                cls_cost=dict(type='FocalLossCost', weight=2.0),
-                reg_cost=dict(type='BBox3DL1Cost', weight=0.25),
-                iou_cost=dict(type='IoUCost', weight=0.0), # Fake cost. This is just to make it compatible with DETR head. 
-                iou_calculator=dict(type='BboxOverlaps3D', coordinate='lidar'),
-                # pc_range=point_cloud_range
-                )
-            )
-        ),
+    test_cfg=dict(
+        pts=None, # requured by mvx_two_stage
+        grid_size=[1440, 1440, 41], # pc_range/voxel_size
+        voxel_size=voxel_size,
+        # point_cloud_range=point_cloud_range, # determined by dataset
+        out_size_factor=8, # grid_size/feature_map_size
+    ),
     loss=dict(
         type='TrackingLossCombo',
         num_classes=10,
@@ -224,6 +215,10 @@ model = dict(
             alpha=0.25,
             loss_weight=2.0),
         loss_bbox=dict(type='mmdet.L1Loss', loss_weight=0.25),
+        loss_heatmap=dict(
+            type='mmdet.GaussianFocalLoss', reduction='mean', loss_weight=1.0),
+        gaussian_overlap=0.1,
+        min_gauss_radius=2,
         loss_iou=dict(type='mmdet.GIoULoss', loss_weight=0.0),
         loss_prediction=dict(type='mmdet.L1Loss', loss_weight=0.5),
         assigner=dict(
@@ -233,4 +228,6 @@ model = dict(
             iou_cost=dict(type='IoUCost', weight=0.0), # Fake cost. This is just to make it compatible with DETR head. 
             iou_calculator=dict(type='BboxOverlaps3D', coordinate='lidar'),
             # pc_range=point_cloud_range
-            )))
+        )
+    )
+)

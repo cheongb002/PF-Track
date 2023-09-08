@@ -37,7 +37,7 @@ class BEVFusionTrackingHead(PETRCamTrackingHead):
                 head with normalized coordinate format (cx, cy, w, l, cz, h, theta, vx, vy). \
                 Shape [nb_dec, bs, num_query, 9].
         """
-        x = mlvl_feats[0]
+        x = mlvl_feats
         batch_size = x.size(0)
         bev_h, bev_w = x.size(2), x.size(3)
         x = self.input_proj(x)

@@ -8,18 +8,16 @@ custom_imports = dict(imports=['projects.BEVFusion.bevfusion'], allow_failed_imp
 custom_imports = dict(imports=['projects.tracking_plugin'], allow_failed_imports=False)
 
 
-point_cloud_range = [-54.0, -54.0, -5.0, 54.0, 54.0, 3.0]
+point_cloud_range = [-54.0, -54.0, -5.0, 54.0, 54.0, 3.0] # from nuscenes config
 model = dict(
     train_backbone=False,
     voxelize_cfg=dict(point_cloud_range=point_cloud_range),
     pc_range = point_cloud_range,
     spatial_temporal_reason=dict(pc_range=point_cloud_range),
     pts_bbox_head=dict(bbox_coder=dict(pc_range=point_cloud_range)),
-    train_cfg=dict(
-        pts=dict(
-            point_cloud_range=point_cloud_range,
-            assigner=dict(pc_range=point_cloud_range)
-        ),
+    test_cfg=dict(
+        point_cloud_range=point_cloud_range,
+        dataset='nuScenes'
     ),
     loss=dict(assigner=dict(pc_range=point_cloud_range)),
 )
@@ -30,8 +28,8 @@ plugin_dir = 'projects/'
 
 file_client_args = dict(backend='disk')
 
-# optimizer
-lr = 2e-4  # max learning rate
+num_epochs = 20
+lr = 1e-5
 optim_wrapper = dict(
     type='OptimWrapper',
     optimizer=dict(
@@ -45,13 +43,6 @@ optim_wrapper = dict(
         # pts_neck=dict(lr_mult=0.1),
         ))
 )
-
-num_epochs = 20
-lr = 5e-5
-optim_wrapper = dict(
-    type='OptimWrapper',
-    optimizer=dict(type='AdamW', lr=lr, weight_decay=0.01),
-    clip_grad=dict(max_norm=35, norm_type=2))
 param_scheduler = [
     # learning rate scheduler
     # During the first 8 epochs, learning rate increases from 0 to lr * 10
@@ -93,7 +84,7 @@ param_scheduler = [
         by_epoch=True,
         convert_to_iter_based=True)
 ]
-train_cfg = dict(max_epochs=num_epochs, val_interval=2)
+train_cfg = dict(max_epochs=num_epochs, val_interval=4)
 find_unused_parameters=True
 
 load_from='ckpts/BEVFusion/lidar/epoch_20.pth'

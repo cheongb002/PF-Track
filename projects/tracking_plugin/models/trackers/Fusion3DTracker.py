@@ -6,11 +6,14 @@ from typing import Optional
 
 import numpy as np
 import torch
+import torch.nn as nn
+from mmcv.cnn import ConvModule, build_conv_layer
 from mmdet3d.registry import MODELS
 from mmengine.structures import InstanceData
 from torch.nn import functional as F
 
 from projects.BEVFusion.bevfusion.ops import Voxelization
+from projects.PETR.petr.petr_head import pos2posemb3d
 from projects.tracking_plugin.core.instances import Instances
 
 from .Cam3DTracker import Cam3DTracker, track_bbox3d2result
@@ -18,14 +21,20 @@ from .Cam3DTracker import Cam3DTracker, track_bbox3d2result
 
 @MODELS.register_module()
 class Fusion3DTracker(Cam3DTracker):
+    NUS_PEDESTRIAN_IDX = 6
+    NUS_TRAFFIC_CONE_IDX = 8
     def __init__(
             self, 
             *args, 
             voxelize_cfg:dict, 
             voxelize_reduce:bool,
+            feat_channels:int=512, # lidar backbone output
+            hidden_channel:int=128,
             view_transform:Optional[dict]=None,
             fusion_layer:Optional[dict]=None,
             batch_clip:bool=True,
+            heatmap_query_init:bool=False,
+            heatmap_nms_kernel:int=3,
             **kwargs
         ):
         """Fusion3DTracker.
@@ -42,7 +51,7 @@ class Fusion3DTracker(Cam3DTracker):
             self.fusion_layer = MODELS.build(fusion_layer)
             assert view_transform is not None, "view_transform should be provided when fusion_layer is not None"
             self.view_transform = MODELS.build(view_transform)
-        if not self.train_backbone:
+        if not self.train_backbone: # needs to be called after super init
             for param in self.pts_voxel_encoder.parameters():
                 param.requires_grad = False
             for param in self.pts_middle_encoder.parameters():
@@ -61,9 +70,65 @@ class Fusion3DTracker(Cam3DTracker):
                 for param in self.fusion_layer.parameters():
                     param.requires_grad = False
 
+        # to go from input to the hidden channel
+        self.shared_conv = build_conv_layer(
+            dict(type='Conv2d'),
+            feat_channels, # 512
+            hidden_channel, # 128
+            kernel_size=3,
+            padding=1,
+            bias='auto',
+        )
+        self.heatmap_query_init = heatmap_query_init
+        if self.heatmap_query_init:
+            layers = []
+            layers.append(
+                ConvModule(
+                    hidden_channel,
+                    hidden_channel,
+                    kernel_size=3,
+                    padding=1,
+                    bias='auto',
+                    conv_cfg=dict(type='Conv2d'),
+                    norm_cfg=dict(type='BN2d'),
+                ))
+            layers.append(
+                build_conv_layer(
+                    dict(type='Conv2d'),
+                    hidden_channel,
+                    self.num_classes,
+                    kernel_size=3,
+                    padding=1,
+                    bias='auto',
+                ))
+            self.heatmap_head = nn.Sequential(*layers)
+            self.class_encoding = nn.Conv1d(self.num_classes, hidden_channel, 1)
+            self.nms_kernel = heatmap_nms_kernel
+            # x_size, y_size of feature map
+            x_size = self.test_cfg['grid_size'][0] // self.test_cfg['out_size_factor']
+            y_size = self.test_cfg['grid_size'][1] // self.test_cfg['out_size_factor']
+            self.bev_pos = self.create_2D_grid(x_size, y_size)
+            # append 0.5 to the end of the position embedding to represent the z dimension
+            self.bev_pos = torch.cat([self.bev_pos, torch.zeros_like(self.bev_pos[:, :, :1]) + 0.5], dim=-1) # [1, x_size * y_size, 3]
+
     def init_weights(self) -> None:
         if self.with_img_backbone:
             self.img_backbone.init_weights()
+
+    def create_2D_grid(self, x_size:int, y_size:int):
+        """create meshgrid for 2D position embedding
+        Each coordinate is in the range of [0, 1]
+        The dimension of the output is [1, x_size * y_size, 2]        
+        """
+        meshgrid = [[0, 1, x_size], [0, 1, y_size]]
+        # NOTE: modified
+        batch_x, batch_y = torch.meshgrid(
+            *[torch.linspace(it[0], it[1], it[2]) for it in meshgrid])
+        batch_x = batch_x + 0.5/x_size
+        batch_y = batch_y + 0.5/y_size
+        coord_base = torch.cat([batch_x[None], batch_y[None]], dim=0)[None]
+        coord_base = coord_base.view(1, 2, -1).permute(0, 2, 1)
+        return coord_base
 
     def loss(
             self,
@@ -103,7 +168,11 @@ class Fusion3DTracker(Cam3DTracker):
         # Use PETR head to decode the bounding boxes on every frame
         outs = list()
         # returns only single set of track instances, corresponding to single batch
-        next_frame_track_instances = self.generate_empty_instance()
+        if self.heatmap_query_init:
+            next_frame_track_instances, dense_heatmap = self.generate_heatmap_query_instance(fused_feats[0])
+        else:
+            next_frame_track_instances = self.generate_empty_instance()
+            dense_heatmap = None
         device = next_frame_track_instances.reference_points.device
 
         # Running over all the frames one by one
@@ -122,6 +191,9 @@ class Fusion3DTracker(Cam3DTracker):
                 fused_feats[frame_idx], img_metas_single_frame, 
                 track_instances.query_feats, track_instances.query_embeds, 
                 track_instances.reference_points)
+            
+            # add heatmap to out dict for loss computation
+            out['dense_heatmap'] = dense_heatmap
 
             # 1. Record the information into the track instances cache
             track_instances = self.load_detection_output_into_cache(track_instances, out)
@@ -154,30 +226,35 @@ class Fusion3DTracker(Cam3DTracker):
                     gt_forecasting_masks,
                     ff_instance_inds)
 
-            # 4. Prepare for next frame
-            track_instances = self.frame_summarization(track_instances, tracking=False)
-            active_mask = self.runtime_tracker.get_active_mask(track_instances, training=True)
-            track_instances.track_query_mask[active_mask] = True
-            active_track_instances = track_instances[active_mask]
-            if self.motion_prediction and frame_idx < num_frame - 1:
-                # assume batch size is 1
-                time_delta = data_samples[frame_idx+1][0].metainfo['timestamp'] - data_samples[frame_idx][0].metainfo['timestamp']
-                active_track_instances = self.update_reference_points(
-                    active_track_instances,
-                    time_delta,
-                    use_prediction=self.motion_prediction_ref_update,
-                    tracking=False)
-            if self.if_update_ego and frame_idx < num_frame - 1:
-                active_track_instances = self.update_ego(
-                    active_track_instances, 
-                    data_samples[frame_idx][0].metainfo['lidar2global'].to(device), 
-                    data_samples[frame_idx + 1][0].metainfo['lidar2global'].to(device),
-                )
+            # 4. Prepare for next frame if not on the last frame
             if frame_idx < num_frame - 1:
+                track_instances = self.frame_summarization(track_instances, tracking=False)
+                active_mask = self.runtime_tracker.get_active_mask(track_instances, training=True)
+                track_instances.track_query_mask[active_mask] = True
+                active_track_instances = track_instances[active_mask]
+                if self.motion_prediction:
+                    # assume batch size is 1
+                    time_delta = data_samples[frame_idx+1][0].metainfo['timestamp'] - data_samples[frame_idx][0].metainfo['timestamp']
+                    active_track_instances = self.update_reference_points(
+                        active_track_instances,
+                        time_delta,
+                        use_prediction=self.motion_prediction_ref_update,
+                        tracking=False)
+                if self.if_update_ego:
+                    active_track_instances = self.update_ego(
+                        active_track_instances, 
+                        data_samples[frame_idx][0].metainfo['lidar2global'].to(device), 
+                        data_samples[frame_idx + 1][0].metainfo['lidar2global'].to(device),
+                    )
                 active_track_instances = self.STReasoner.sync_pos_embedding(active_track_instances, self.query_embedding)
             
-            empty_track_instances = self.generate_empty_instance()
-            next_frame_track_instances = Instances.cat([empty_track_instances, active_track_instances])
+                if self.heatmap_query_init:
+                    empty_track_instances, dense_heatmap = self.generate_heatmap_query_instance(fused_feats[frame_idx+1])
+                else:
+                    empty_track_instances = self.generate_empty_instance()
+                    dense_heatmap = None
+                next_frame_track_instances = Instances.cat([empty_track_instances, active_track_instances])
+
             self.runtime_tracker.frame_index += 1
             outs.append(out)
         losses = self.criterion(outs)
@@ -213,8 +290,13 @@ class Fusion3DTracker(Cam3DTracker):
             img_metas_single_frame = [ds[frame_idx].metainfo for ds in data_samples]
         
             # 1. Update the information of previous active tracks
+            if self.heatmap_query_init:
+                empty_track_instances, _ = self.generate_heatmap_query_instance(fused_feats[frame_idx])
+            else:
+                empty_track_instances = self.generate_empty_instance()
+
             if prev_active_track_instances is None:
-                track_instances = self.generate_empty_instance()
+                track_instances = empty_track_instances
             else:
                 device = prev_active_track_instances.reference_points.device
                 if self.motion_prediction:
@@ -227,7 +309,7 @@ class Fusion3DTracker(Cam3DTracker):
                         prev_active_track_instances, self.runtime_tracker.l2g.to(device), 
                         img_metas_single_frame[0]['lidar2global'].to(device))
                 prev_active_track_instances = self.STReasoner.sync_pos_embedding(prev_active_track_instances, self.query_embedding)
-                track_instances = Instances.cat([self.generate_empty_instance(), prev_active_track_instances])
+                track_instances = Instances.cat([empty_track_instances, prev_active_track_instances])
 
             self.runtime_tracker.l2g = img_metas_single_frame[0]['lidar2global']
             self.runtime_tracker.timestamp = img_metas_single_frame[0]['timestamp']
@@ -329,7 +411,7 @@ class Fusion3DTracker(Cam3DTracker):
             fused_feats = self.extract_feat(input_dict, input_metas)
             # extract output from superbatch back to clip
             for frame_idx in range(num_frames):
-                outputs.append([fused_feats[0][frame_idx * batch_size:(frame_idx + 1) * batch_size]])
+                outputs.append(fused_feats[frame_idx * batch_size:(frame_idx + 1) * batch_size])
         else:
             # process each frame in clip separately
             for frame_idx, (img_frame, pts_frame) in enumerate(zip(img_clip, pts_clip)):
@@ -380,7 +462,8 @@ class Fusion3DTracker(Cam3DTracker):
             x = features[0]
 
         x = self.pts_backbone(x)
-        x = self.pts_neck(x)
+        x = self.pts_neck(x)[0]
+        x = self.shared_conv(x)
         return x
 
     def extract_img_feat(
@@ -455,3 +538,76 @@ class Fusion3DTracker(Cam3DTracker):
                 feats = feats.contiguous()
 
         return feats, coords, sizes
+
+    def generate_heatmap_query_instance(self, fused_feat:torch.Tensor):
+        empty_track_instances = self.generate_empty_instance()
+
+        batch_size = fused_feat.shape[0]
+        fused_feat_flatten = fused_feat.view(batch_size, fused_feat.shape[1], -1) # [B, C, H*W]
+        dense_heatmap = self.heatmap_head(fused_feat)
+        # technically sigmoid here is optional since we only use the max value.
+        # sigmoid is applied again in the loss computation
+        heatmap = dense_heatmap.detach().sigmoid()
+        padding = self.nms_kernel // 2
+        local_max = torch.zeros_like(heatmap)
+        local_max_inner = F.max_pool2d(
+            heatmap, kernel_size=self.nms_kernel, stride=1, padding=0)
+        local_max[:, :, padding:(-padding),
+                  padding:(-padding)] = local_max_inner
+
+        assert 'dataset' in self.test_cfg, 'dataset should be specified in test_cfg'
+        if self.test_cfg['dataset'] == 'nuScenes': # for Pedestrian & Traffic_cone in nuScenes
+            # set kernel for pedestrian to 1
+            local_max[:, self.NUS_PEDESTRIAN_IDX, ] = F.max_pool2d(
+                heatmap[:, self.NUS_PEDESTRIAN_IDX], kernel_size=1, stride=1, padding=0)
+            # set kernel for traffic_cone to 1
+            local_max[:, self.NUS_TRAFFIC_CONE_IDX, ] = F.max_pool2d(
+                heatmap[:, self.NUS_TRAFFIC_CONE_IDX], kernel_size=1, stride=1, padding=0)
+        elif self.test_cfg[
+                'dataset'] == 'Waymo':  # for Pedestrian & Cyclist in Waymo
+            raise NotImplementedError
+            # local_max[:, 1, ] = F.max_pool2d(
+            #     heatmap[:, 1], kernel_size=1, stride=1, padding=0)
+            # local_max[:, 2, ] = F.max_pool2d(
+            #     heatmap[:, 2], kernel_size=1, stride=1, padding=0)
+        else:
+            raise NotImplementedError
+        heatmap = heatmap * (heatmap == local_max)
+        heatmap = heatmap.view(batch_size, heatmap.shape[1], -1)
+
+        # top num_proposals among all classes
+        top_proposals = heatmap.view(batch_size, -1).argsort(
+            dim=-1, descending=True)[..., :self.num_query]
+        top_proposals_class = top_proposals // heatmap.shape[-1]
+        top_proposals_index = top_proposals % heatmap.shape[-1]
+        query_feat = fused_feat_flatten.gather(
+            index=top_proposals_index[:, None, :].expand(
+                -1, fused_feat_flatten.shape[1], -1),
+            dim=-1,
+        )
+
+        # add category embedding
+        one_hot = F.one_hot(
+            top_proposals_class,
+            num_classes=self.num_classes).permute(0, 2, 1)
+        query_cat_encoding = self.class_encoding(one_hot.float())
+        query_feat += query_cat_encoding
+        bev_pos = self.bev_pos.repeat(batch_size, 1, 1).to(query_feat.device)
+        query_pos = bev_pos.gather(
+            index=top_proposals_index[:, None, :].permute(0, 2, 1).expand(
+                -1, -1, bev_pos.shape[-1]),
+            dim=1,
+        )
+
+        """Detection queries"""
+        # remove batch dim
+        empty_track_instances.reference_points = query_pos[0].clone()
+        # convert query_feat from [C, num_query] to [num_query, C]
+        empty_track_instances.query_feats = query_feat[0].clone().permute(1, 0)
+        empty_track_instances.query_embeds = self.query_embedding(pos2posemb3d(query_pos[0]))
+        """Cache for current frame information, loading temporary data for spatial-temporal reasoning"""
+        empty_track_instances.cache_reference_points = empty_track_instances.reference_points.clone()
+        empty_track_instances.cache_query_embeds = empty_track_instances.query_embeds.clone()
+        empty_track_instances.cache_query_feats = empty_track_instances.query_feats.clone()
+
+        return empty_track_instances, dense_heatmap
