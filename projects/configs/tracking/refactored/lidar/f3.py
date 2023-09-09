@@ -59,6 +59,6 @@ model = dict(
     ),
 )
 
-val_evaluator = dict(type='NuScenesTrackingMetric')
-test_evaluator = dict(type='NuScenesTrackingMetric')
+val_evaluator = dict(type='NuScenesTrackingMetric', jsonfile_prefix='work_dirs/nuscenes_results/tracking')
+test_evaluator = dict(type='NuScenesTrackingMetric', jsonfile_prefix='work_dirs/nuscenes_results/tracking')
 load_from = 'ckpts/f1_heatmap/epoch_20.pth'
