@@ -60,6 +60,13 @@ def main():
     dataset_cfg.pop('type')
     dataset = NuScenesTrackingDataset(**dataset_cfg)
     results = json.load(open(args.result))['results']
+    # check if detection or tracking json
+    if 'tracking_score' in results[0].keys():
+        tracking = True
+        score_string = 'tracking_score'
+    else:
+        tracking = False
+        score_string = 'detection_score'
     sample_tokens = results.keys()
     data_infos = [dataset.get_data_info(i) for i in range(len(dataset))]
     data_info_sample_tokens = [info['token'] for info in data_infos]
@@ -107,7 +114,7 @@ def main():
         
         frame_results = results[sample_token]
         for i, box in enumerate(frame_results):
-            if box['tracking_score'] < 0.4:
+            if box[score_string] < 0.4:
                 continue
             nusc_box = Box(box['translation'], box['size'], Quaternion(box['rotation']))
             mot_bbox = BBox(
@@ -115,16 +122,16 @@ def main():
                 w=nusc_box.wlh[0], l=nusc_box.wlh[1], h=nusc_box.wlh[2],
                 o=nusc_box.orientation.yaw_pitch_roll[0]
             )
-            track_id = int(box['tracking_id'].split('-')[-1])
+            track_id = int(box.get('tracking_id', '0').split('-')[-1])
             color = COLOR_KEYS[track_id % len(COLOR_KEYS)]
             # visualizer.handler_box(mot_bbox, message='', color=color)
-            visualizer.handler_box(mot_bbox, message=box['tracking_id'].split('-')[-1], color=color)
+            visualizer.handler_box(mot_bbox, message=box.get('tracking_id', '0').split('-')[-1], color=color)
 
         # forecasting prediction visualization
         all_trajs = list()
         color_list = list()
         for i, box in enumerate(frame_results):
-            if box['tracking_score'] < 0.4:
+            if box[score_string] < 0.4:
                 continue
             if 'forecasting' in box.keys() and box['forecasting'] is not None:
                 # traj [T * 2]
