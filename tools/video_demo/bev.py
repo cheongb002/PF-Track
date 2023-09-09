@@ -61,7 +61,7 @@ def main():
     dataset = NuScenesTrackingDataset(**dataset_cfg)
     results = json.load(open(args.result))['results']
     # check if detection or tracking json
-    if 'tracking_score' in results[0].keys():
+    if 'tracking_score' in results[list(results.keys())[0]][0].keys():
         tracking = True
         score_string = 'tracking_score'
     else:
@@ -105,6 +105,7 @@ def main():
         ego_xyz = l2g[:3, 3]
         plt.xlim((ego_xyz[0] - 60, ego_xyz[0] + 60))
         plt.ylim((ego_xyz[1] - 60, ego_xyz[1] + 60))
+        # GT visualization
         for i, (box, obj_id) in enumerate(zip(gt_bboxes, instance_ids)):
             bbox = BBox(x=box[0], y=box[1], z=box[2],
                         w=box[3], l=box[4], h=box[5],
@@ -112,6 +113,7 @@ def main():
             bbox = BBox.bbox2world(e2g @ l2e, bbox)
             visualizer.handler_box(bbox, linestyle='dashed', color='black')
         
+        # prediction visualization
         frame_results = results[sample_token]
         for i, box in enumerate(frame_results):
             if box[score_string] < 0.4:
@@ -122,10 +124,9 @@ def main():
                 w=nusc_box.wlh[0], l=nusc_box.wlh[1], h=nusc_box.wlh[2],
                 o=nusc_box.orientation.yaw_pitch_roll[0]
             )
-            track_id = int(box.get('tracking_id', '0').split('-')[-1])
+            track_id = 0 if not tracking else int(box['tracking_id'].split('-')[-1])
             color = COLOR_KEYS[track_id % len(COLOR_KEYS)]
-            # visualizer.handler_box(mot_bbox, message='', color=color)
-            visualizer.handler_box(mot_bbox, message=box.get('tracking_id', '0').split('-')[-1], color=color)
+            visualizer.handler_box(mot_bbox, message=str(track_id), color=color)
 
         # forecasting prediction visualization
         all_trajs = list()
