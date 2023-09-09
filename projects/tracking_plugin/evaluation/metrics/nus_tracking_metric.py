@@ -70,10 +70,10 @@ class NuScenesTrackingMetric(NuScenesMetric):
     def __init__(
             self, 
             *args,
-            eval_version="tracking_nips_2019",
+            tracking_eval_version="tracking_nips_2019",
             **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.eval_tracking_configs = track_configs(eval_version)
+        self.eval_tracking_configs = track_configs(tracking_eval_version)
 
     def process(self, data_batch: dict, data_samples: Sequence[dict]) -> None:
         """Process one batch of data samples and predictions.
@@ -146,6 +146,8 @@ class NuScenesTrackingMetric(NuScenesMetric):
                     size=box.wlh.tolist(),
                     rotation=box.orientation.elements.tolist(),
                     velocity=box.velocity[:2].tolist(),
+                    detection_name=name,
+                    detection_score=box.score,
                     tracking_name=name,
                     tracking_score=box.score,
                     tracking_id=box.token,
@@ -209,6 +211,11 @@ class NuScenesTrackingMetric(NuScenesMetric):
         
         for key in keys:
             detail['{}/{}'.format(metric_prefix, key)] = metrics[key]
+
+        # evaluate detection metrics
+        det_metrics = super()._evaluate_single(result_path, classes, result_name)
+        detail.update(det_metrics)
+
         return detail
     
 
