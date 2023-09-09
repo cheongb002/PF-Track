@@ -45,37 +45,37 @@ val_pkl_path = 'mmlab-v2/tracking_forecasting_infos_val.pkl'
 
 train_pipeline = [
     dict(
-        type='mmdet3.LoadPointsFromFile',
+        type='mmdet3d.LoadPointsFromFile',
         coord_type='LIDAR',
         load_dim=5,
         use_dim=5,
         backend_args=backend_args),
     dict(
-        type='mmdet3.LoadPointsFromMultiSweeps',
+        type='mmdet3d.LoadPointsFromMultiSweeps',
         sweeps_num=9,
         load_dim=5,
         use_dim=5,
         pad_empty_sweeps=True,
         remove_close=True,
         backend_args=backend_args),
-    dict(type='mmdet3.TrackLoadAnnotations3D', 
+    dict(type='mmdet3d.TrackLoadAnnotations3D', 
          with_bbox_3d=True, 
          with_label_3d=True, 
          with_forecasting=True),
     dict(
-        type='mmdet3.GlobalRotScaleTrans',
+        type='mmdet3d.GlobalRotScaleTrans',
         scale_ratio_range=[0.9, 1.1],
         rot_range=[-0.78539816, 0.78539816],
         translation_std=0.5),
-    dict(type='mmdet3.BEVFusionRandomFlip3D'),
-    dict(type='mmdet3.PointsRangeFilter', point_cloud_range=point_cloud_range),
-    dict(type='mmdet3.TrackInstanceRangeFilter', point_cloud_range=point_cloud_range),
-    dict(type='mmdet3.TrackObjectNameFilter', classes=class_names),
-    dict(type='mmdet3.PointShuffle'),
+    dict(type='mmdet3d.BEVFusionRandomFlip3D'),
+    dict(type='mmdet3d.PointsRangeFilter', point_cloud_range=point_cloud_range),
+    dict(type='mmdet3d.TrackInstanceRangeFilter', point_cloud_range=point_cloud_range),
+    dict(type='mmdet3d.TrackObjectNameFilter', classes=class_names),
+    dict(type='mmdet3d.PointShuffle'),
 ]
 
 train_pipeline_multiframe = [
-    dict(type='mmdet3.Pack3DTrackInputs', 
+    dict(type='mmdet3d.Pack3DTrackInputs', 
          keys=[
             'points', 'gt_bboxes_3d', 'gt_labels_3d', 'instance_inds', 
             'gt_forecasting_locs', 'gt_forecasting_masks', 'gt_forecasting_types'],
@@ -90,13 +90,13 @@ train_pipeline_multiframe = [
 
 test_pipeline = [
     dict(
-        type='mmdet3.LoadPointsFromFile',
+        type='mmdet3d.LoadPointsFromFile',
         coord_type='LIDAR',
         load_dim=5,
         use_dim=5,
         backend_args=backend_args),
     dict(
-        type='mmdet3.LoadPointsFromMultiSweeps',
+        type='mmdet3d.LoadPointsFromMultiSweeps',
         sweeps_num=9,
         load_dim=5,
         use_dim=5,
@@ -104,13 +104,13 @@ test_pipeline = [
         remove_close=True,
         backend_args=backend_args),
     dict(
-        type='mmdet3.PointsRangeFilter',
+        type='mmdet3d.PointsRangeFilter',
         point_cloud_range=point_cloud_range),
 ]
 
 test_pipeline_multiframe = [
     dict(
-        type='mmdet3.Pack3DTrackInputs',
+        type='mmdet3d.Pack3DTrackInputs',
         keys=['points'],
         meta_keys=[
             'cam2img', 'ori_cam2img', 'lidar2cam', 'lidar2img', 'cam2lidar',
