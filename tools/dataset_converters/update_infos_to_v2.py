@@ -1302,7 +1302,7 @@ def update_pkl_infos(dataset, out_dir, pkl_path):
         update_lyft_infos(pkl_path=pkl_path, out_dir=out_dir)
     elif dataset.lower() == 'nuscenes':
         update_nuscenes_infos(pkl_path=pkl_path, out_dir=out_dir)
-    elif dataset.lower() == 'nuscenes_tracking':
+    elif dataset.lower() == 'nuscenes-tracking':
         update_nuscenes_tracking_infos(pkl_path=pkl_path, out_dir=out_dir)
     elif dataset.lower() == 's3dis':
         update_s3dis_infos(pkl_path=pkl_path, out_dir=out_dir)
