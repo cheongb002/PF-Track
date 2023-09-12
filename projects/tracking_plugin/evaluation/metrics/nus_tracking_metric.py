@@ -67,6 +67,10 @@ class NuScenesTrackingMetric(NuScenesMetric):
     TRACKING_CLASSES = ['car', 'truck', 'bus', 'trailer',
                'motorcycle', 'bicycle', 'pedestrian']
 
+    KEYS = ['amota', 'amotp', 'recall', 'motar',
+            'gt', 'mota', 'motp', 'mt', 'ml', 'faf',
+            'tp', 'fp', 'fn', 'ids', 'frag', 'tid', 'lgd']
+
     def __init__(
             self, 
             *args,
@@ -191,30 +195,30 @@ class NuScenesTrackingMetric(NuScenesMetric):
             'v1.0-mini': 'mini_val',
             'v1.0-trainval': 'val',
         }
-        nusc_eval = TrackingEval(
-            config=self.eval_tracking_configs,
-            result_path=result_path,
-            eval_set=eval_set_map[self.version],
-            output_dir=output_dir,
-            verbose=True,
-            nusc_version=self.version,
-            nusc_dataroot=self.data_root)
-        nusc_eval.main(render_curves=False)
-
-        # record metrics
-        metrics = mmengine.load(osp.join(output_dir, 'metrics_summary.json'))
         detail = dict()
-        metric_prefix = f'{result_name}_NuScenes'
-        keys = ['amota', 'amotp', 'recall', 'motar',
-                'gt', 'mota', 'motp', 'mt', 'ml', 'faf',
-                'tp', 'fp', 'fn', 'ids', 'frag', 'tid', 'lgd']
-        
-        for key in keys:
-            detail['{}/{}'.format(metric_prefix, key)] = metrics[key]
+        try:
+            nusc_eval = TrackingEval(
+                config=self.eval_tracking_configs,
+                result_path=result_path,
+                eval_set=eval_set_map[self.version],
+                output_dir=output_dir,
+                verbose=True,
+                nusc_version=self.version,
+                nusc_dataroot=self.data_root)
+            nusc_eval.main(render_curves=False)
 
-        # evaluate detection metrics
-        det_metrics = super()._evaluate_single(result_path, classes, result_name)
-        detail.update(det_metrics)
+            # record metrics
+            metrics = mmengine.load(osp.join(output_dir, 'metrics_summary.json'))
+            metric_prefix = f'{result_name}_NuScenes'
+            
+            for key in self.KEYS:
+                detail['{}/{}'.format(metric_prefix, key)] = metrics[key]
+            # evaluate detection metrics
+            det_metrics = super()._evaluate_single(result_path, classes, result_name)
+            detail.update(det_metrics)
+        except Exception as e:
+            # log the error and continue
+            print(f'Error occurs when evaluating {result_path}: {e}')
 
         return detail
     
