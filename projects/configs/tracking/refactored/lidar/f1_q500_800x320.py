@@ -43,6 +43,7 @@ optim_wrapper = dict(
         # pts_neck=dict(lr_mult=0.1),
         ))
 )
+
 param_scheduler = [
     # learning rate scheduler
     # During the first 8 epochs, learning rate increases from 0 to lr * 10
@@ -89,6 +90,9 @@ find_unused_parameters=True
 
 load_from='ckpts/BEVFusion/lidar/epoch_20.pth'
 resume_from=None
-default_hooks=dict(logger=dict(interval=100))
+default_hooks=dict(
+    logger=dict(interval=500), 
+    # checkpoint=dict(interval=1)
+)
 
 randomness = dict(seed=1792775515)
