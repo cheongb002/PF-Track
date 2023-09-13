@@ -10,8 +10,6 @@ class_names = [
     'motorcycle', 'bicycle', 'pedestrian', 
     'construction_vehicle', 'traffic_cone', 'barrier' # non-detection classes must go at the end
 ]
-metainfo = dict(classes=class_names, version='v1.0-trainval')
-# metainfo = dict(classes=class_names, version='v1.0-mini')
 
 dataset_type = 'NuScenesTrackingDataset'
 data_root = './data/nuscenes/'
@@ -36,9 +34,11 @@ data_prefix = dict(pts='samples/LIDAR_TOP', sweeps='sweeps/LIDAR_TOP')
 backend_args = None
 
 # pkl paths
+metainfo = dict(classes=class_names, version='v1.0-trainval')
 train_pkl_path = 'mmlab-v2/tracking_forecasting_infos_train.pkl'
 test_pkl_path = 'mmlab-v2/tracking_forecasting_infos_val.pkl'
 val_pkl_path = 'mmlab-v2/tracking_forecasting_infos_val.pkl'
+# metainfo = dict(classes=class_names, version='v1.0-mini')
 # train_pkl_path = 'mmlab-v2/tracking_forecasting-mini_infos_val.pkl'
 # test_pkl_path = 'mmlab-v2/tracking_forecasting-mini_infos_val.pkl'
 # val_pkl_path = 'mmlab-v2/tracking_forecasting-mini_infos_val.pkl'
