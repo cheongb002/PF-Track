@@ -29,7 +29,7 @@ plugin_dir = 'projects/'
 file_client_args = dict(backend='disk')
 
 num_epochs = 20
-lr = 1e-5
+lr = 5e-5
 optim_wrapper = dict(
     type='OptimWrapper',
     optimizer=dict(

@@ -35,9 +35,9 @@ backend_args = None
 
 # pkl paths
 metainfo = dict(classes=class_names, version='v1.0-trainval')
-train_pkl_path = 'mmlab-v2/tracking_forecasting_infos_train.pkl'
-test_pkl_path = 'mmlab-v2/tracking_forecasting_infos_val.pkl'
-val_pkl_path = 'mmlab-v2/tracking_forecasting_infos_val.pkl'
+train_pkl_path = 'mmlab-v2/nuscenes_infos_train.pkl'
+test_pkl_path = 'mmlab-v2/nuscenes_infos_val.pkl'
+val_pkl_path = 'mmlab-v2/nuscenes_infos_val.pkl'
 # metainfo = dict(classes=class_names, version='v1.0-mini')
 # train_pkl_path = 'mmlab-v2/tracking_forecasting-mini_infos_val.pkl'
 # test_pkl_path = 'mmlab-v2/tracking_forecasting-mini_infos_val.pkl'
