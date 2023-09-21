@@ -20,7 +20,7 @@ from projects.tracking_plugin.datasets import NuScenesTrackingDataset
 def parse_args():
     parser = argparse.ArgumentParser(description='3D Tracking Visualization')
     parser.add_argument('config', help='test config file path')
-    parser.add_argument('--result', help='results file in pickle format')
+    parser.add_argument('--result', help='results file in json format')
     parser.add_argument(
         '--show-dir', help='directory where visualize results will be saved')
     args = parser.parse_args()
