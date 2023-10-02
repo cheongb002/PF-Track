@@ -2,8 +2,8 @@ WORK_DIR=${PWD}
 PROJECT=pf_track2
 DOCKER_IMAGE=bcheong/${PROJECT}:latest
 DOCKER_FILE=docker/Dockerfile-pftrack
-DATA_ROOT_LOCAL=/media/brian/Data2/nuscenes/v1.0-mini
-# DATA_ROOT_LOCAL=/media/brian/Data2/nuscenes/v1.0-trainval
+DATA_ROOT_LOCAL_MINI=/media/brian/Data2/nuscenes/v1.0-mini
+DATA_ROOT_LOCAL=/media/brian/Data2/nuscenes/v1.0-trainval
 
 DATA_ROOT_APOLLO=/scratch/hpc_nas/datasets/nuscenes/v1.0-trainval
 # DATA_ROOT_APOLLO=/scratch/hpc_nas/datasets/nuscenes/v1.0-mini
@@ -39,6 +39,15 @@ docker-build:
 	-f $(DOCKER_FILE) \
 	-t $(DOCKER_IMAGE) \
 	$(DOCKER_BUILD_ARGS) .
+
+docker-dev-local-mini:
+	docker run \
+	--runtime=nvidia \
+	--gpus all \
+	--name $(PROJECT) \
+	-v ${DATA_ROOT_LOCAL_MINI}:/workspace/${PROJECT}/data/nuscenes \
+	$(DOCKER_OPTS) \
+	$(DOCKER_IMAGE) bash
 
 docker-dev-local:
 	docker run \
