@@ -193,7 +193,9 @@ class NuScenesTrackingMetric(NuScenesMetric):
 
         eval_set_map = {
             'v1.0-mini': 'mini_val',
+            # 'v1.0-mini': 'mini_train',
             'v1.0-trainval': 'val',
+            # 'v1.0-trainval': 'train',
         }
         detail = dict()
         try:

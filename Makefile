@@ -6,6 +6,7 @@ DATA_ROOT_LOCAL=/media/brian/Data2/nuscenes/v1.0-mini
 # DATA_ROOT_LOCAL=/media/brian/Data2/nuscenes/v1.0-trainval
 
 DATA_ROOT_APOLLO=/scratch/hpc_nas/datasets/nuscenes/v1.0-trainval
+# DATA_ROOT_APOLLO=/scratch/hpc_nas/datasets/nuscenes/v1.0-mini
 OUTPUT_APOLLO=/home/bcheong/job_artifacts
 CKPTS_ROOT=${PWD}/ckpts
 
