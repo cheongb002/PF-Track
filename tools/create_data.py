@@ -116,13 +116,13 @@ def nuscenes_tracking_data_prep(root_path,
         forecasting=forecasting, forecasting_length=forecasting_length)
     if version == 'v1.0-test':
         info_test_path = osp.join(out_dir, f'{info_prefix}_infos_test.pkl')
-        update_pkl_infos('nuscenes', out_dir=out_dir, pkl_path=info_test_path)
+        update_pkl_infos('nuscenes-tracking', out_dir=out_dir, pkl_path=info_test_path)
         return
     # update to v2 infos
     info_train_path = osp.join(out_dir, f'{info_prefix}_infos_train.pkl')
     info_val_path = osp.join(out_dir, f'{info_prefix}_infos_val.pkl')
-    update_pkl_infos('nuscenes', out_dir=out_dir, pkl_path=info_train_path)
-    update_pkl_infos('nuscenes', out_dir=out_dir, pkl_path=info_val_path)
+    update_pkl_infos('nuscenes-tracking', out_dir=out_dir, pkl_path=info_train_path)
+    update_pkl_infos('nuscenes-tracking', out_dir=out_dir, pkl_path=info_val_path)
     # create groundtruth database
     # create_groundtruth_database(dataset_name, root_path, info_prefix,
     #                             f'{info_prefix}_infos_train.pkl')
