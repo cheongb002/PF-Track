@@ -211,10 +211,11 @@ class NuScenesTrackingMetric(NuScenesMetric):
 
             # record metrics
             metrics = mmengine.load(osp.join(output_dir, 'metrics_summary.json'))
-            metric_prefix = f'{result_name}_NuScenes'
-            
+            metric_prefix = f'{result_name}_NuScenes_Tracking'
             for key in self.KEYS:
-                detail['{}/{}'.format(metric_prefix, key)] = metrics[key]
+                detail[f'{metric_prefix}/{key}'] = metrics[key]
+                for name in self.TRACKING_CLASSES:
+                    detail[f'{metric_prefix}/{key}_{name}'] = metrics['label_metrics'][key][name]
             # evaluate detection metrics
             det_metrics = super()._evaluate_single(result_path, classes, result_name)
             detail.update(det_metrics)
