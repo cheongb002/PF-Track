@@ -153,7 +153,7 @@ test_dataloader = dict(
     num_workers=1,
     persistent_workers=True,
     drop_last=False,
-    sampler=dict(type='DefaultSampler', shuffle=False),
+    sampler=dict(type='TrackSampler3D'),
     dataset=dict(
         type=dataset_type,
         num_frames_per_sample=1,
@@ -173,7 +173,7 @@ val_dataloader = dict(
     num_workers=1,
     persistent_workers=True,
     drop_last=False,
-    sampler=dict(type='DefaultSampler', shuffle=False),
+    sampler=dict(type='TrackSampler3D'),
     dataset=dict(
         type=dataset_type,
         num_frames_per_sample=1,

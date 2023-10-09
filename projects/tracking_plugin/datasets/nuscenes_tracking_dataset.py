@@ -37,6 +37,8 @@ class NuScenesTrackingDataset(NuScenesDataset):
         if self.pipeline_multiframe is not None:
             self.pipeline_multiframe = Compose(self.pipeline_multiframe)
         self.scene_tokens = []
+        self.indices_per_scene = {}
+        self.num_frames_per_scene = {}
         super().__init__(*args, **kwargs)
     
     def __len__(self):
@@ -148,7 +150,10 @@ class NuScenesTrackingDataset(NuScenesDataset):
 
     def parse_data_info(self, info: dict) -> Union[List[dict], dict]:
         data_info = super().parse_data_info(info)
-        self.scene_tokens.append(data_info['scene_token'])
+        scene_token = data_info['scene_token']
+        self.scene_tokens.append(scene_token)
+        self.indices_per_scene[scene_token] = self.indices_per_scene.get(
+            scene_token, []) + [len(self.scene_tokens) - 1]
         # ego movement represented by lidar2global
         l2e = np.array(data_info['lidar_points']['lidar2ego'])
         e2g = np.array(data_info['ego2global'])
@@ -195,3 +200,12 @@ class NuScenesTrackingDataset(NuScenesDataset):
             elif (not self.test_mode):
                 index_list[i] = earliest_index
         return index_list
+
+    def get_num_scenes(self):
+        return len(self.num_frames_per_scene)
+    
+    def get_scene_token(self, index):
+        return self.scene_tokens[index]
+
+    def get_all_scene_tokens(self):
+        return list(set(self.scene_tokens))
