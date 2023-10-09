@@ -66,7 +66,7 @@ train_dataloader = dict(
 
 model = dict(
     tracking=True,
-    train_backbone=False,
+    train_backbone=True,
     if_update_ego=True,
     motion_prediction=True,
     motion_prediction_ref_update=True,

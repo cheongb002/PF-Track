@@ -92,7 +92,7 @@ load_from='ckpts/BEVFusion/lidar/epoch_20.pth'
 resume_from=None
 default_hooks=dict(
     logger=dict(interval=500), 
-    # checkpoint=dict(interval=1)
+    checkpoint=dict(interval=1)
 )
 
 randomness = dict(seed=1792775515)
