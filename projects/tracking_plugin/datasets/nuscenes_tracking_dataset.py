@@ -208,4 +208,4 @@ class NuScenesTrackingDataset(NuScenesDataset):
         return self.scene_tokens[index]
 
     def get_all_scene_tokens(self):
-        return list(set(self.scene_tokens))
+        return sorted(list(set(self.scene_tokens)))
