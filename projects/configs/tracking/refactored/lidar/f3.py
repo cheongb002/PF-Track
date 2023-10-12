@@ -89,3 +89,8 @@ model = dict(
 val_evaluator = dict(type='NuScenesTrackingMetric', jsonfile_prefix='work_dirs/nuscenes_results/tracking')
 test_evaluator = dict(type='NuScenesTrackingMetric', jsonfile_prefix='work_dirs/nuscenes_results/tracking')
 load_from = 'ckpts/f1_heatmap/epoch_20.pth'
+
+# set NCCL timeout to 3H to account for the validation computation taking longer than default 30 min on multiple GPUs
+env_cfg = dict(
+    dist_cfg=dict(timeout=10800),
+)
