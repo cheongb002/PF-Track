@@ -82,15 +82,13 @@ model = dict(
         fut_len=8,
     ),
     pts_bbox_head=dict(
-        max_num=150
+        bbox_coder=dict(
+            max_num=150,
+        ),
     ),
 )
 
 val_evaluator = dict(type='NuScenesTrackingMetric', jsonfile_prefix='work_dirs/nuscenes_results/tracking')
 test_evaluator = dict(type='NuScenesTrackingMetric', jsonfile_prefix='work_dirs/nuscenes_results/tracking')
-load_from = 'ckpts/f1_heatmap/epoch_20.pth'
-
-# set NCCL timeout to 3H to account for the validation computation taking longer than default 30 min on multiple GPUs
-env_cfg = dict(
-    dist_cfg=dict(timeout=10800),
-)
+# load_from = 'ckpts/f1_heatmap/epoch_20.pth'
+load_from = 'work_dirs/tracking/lidar/f1/2023-10-14/epoch_4.pth'
