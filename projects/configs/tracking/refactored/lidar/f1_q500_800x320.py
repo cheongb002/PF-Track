@@ -13,7 +13,11 @@ model = dict(
     train_backbone=False,
     voxelize_cfg=dict(point_cloud_range=point_cloud_range),
     pc_range = point_cloud_range,
-    spatial_temporal_reason=dict(pc_range=point_cloud_range),
+    spatial_temporal_reason=dict(
+        history_reasoning=True,
+        future_reasoning=True,
+        fut_len=8,
+        pc_range=point_cloud_range),
     pts_bbox_head=dict(bbox_coder=dict(pc_range=point_cloud_range)),
     test_cfg=dict(
         point_cloud_range=point_cloud_range,
@@ -37,10 +41,10 @@ optim_wrapper = dict(
     clip_grad=dict(max_norm=35, norm_type=2),
     paramwise_cfg=dict(custom_keys=dict(
         img_backbone=dict(lr_mult=0.1),
-        # pts_voxel_encoder=dict(lr_mult=0.1),
-        # pts_middle_encoder=dict(lr_mult=0.1),
-        # pts_backbone=dict(lr_mult=0.1),
-        # pts_neck=dict(lr_mult=0.1),
+        pts_voxel_encoder=dict(lr_mult=0.1),
+        pts_middle_encoder=dict(lr_mult=0.1),
+        pts_backbone=dict(lr_mult=0.1),
+        pts_neck=dict(lr_mult=0.1),
         ))
 )
 
@@ -96,3 +100,7 @@ default_hooks=dict(
 )
 
 randomness = dict(seed=1792775515)
+# set NCCL timeout to 3H to account for the validation computation taking longer than default 30 min on multiple GPUs
+env_cfg = dict(
+    dist_cfg=dict(timeout=10800),
+)
