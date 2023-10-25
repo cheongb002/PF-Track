@@ -30,6 +30,7 @@ file_client_args = dict(backend='disk')
 
 num_epochs = 20
 lr = 5e-5
+lr_max = 5e-4
 optim_wrapper = dict(
     type='OptimWrapper',
     optimizer=dict(
@@ -44,15 +45,24 @@ optim_wrapper = dict(
         ))
 )
 
+# for LR tuning
+# param_scheduler = dict(
+#     _delete_=True,
+#     type='PolyLR',
+#     eta_min=2e-3,
+#     power=0.9,
+#     by_epoch=False,
+# )
+
 param_scheduler = [
     # learning rate scheduler
-    # During the first 8 epochs, learning rate increases from 0 to lr * 10
-    # during the next 12 epochs, learning rate decreases from lr * 10 to
+    # During the first 8 epochs, learning rate increases from lr to lr_max
+    # during the next 12 epochs, learning rate decreases from lr_max to
     # lr * 1e-4
     dict(
         type='CosineAnnealingLR',
         T_max=int(0.4*num_epochs),
-        eta_min=lr * 10,
+        eta_min=lr_max,
         begin=0,
         end=int(0.4*num_epochs),
         by_epoch=True,
@@ -66,12 +76,12 @@ param_scheduler = [
         by_epoch=True,
         convert_to_iter_based=True),
     # momentum scheduler
-    # During the first 8 epochs, momentum increases from 0 to 0.85 / 0.95
-    # during the next 12 epochs, momentum increases from 0.85 / 0.95 to 1
+    # During the first 8 epochs, momentum decreases from the 0.95 to 0.85
+    # during the next 12 epochs, momentum increases from 0.85 to 0.95
     dict(
         type='CosineAnnealingMomentum',
         T_max=int(0.4*num_epochs),
-        eta_min=0.85 / 0.95,
+        eta_min=0.85,
         begin=0,
         end=int(0.4*num_epochs),
         by_epoch=True,
@@ -79,7 +89,7 @@ param_scheduler = [
     dict(
         type='CosineAnnealingMomentum',
         T_max=num_epochs-int(0.4*num_epochs),
-        eta_min=1,
+        eta_min=0.95,
         begin=int(0.4*num_epochs),
         end=num_epochs,
         by_epoch=True,
