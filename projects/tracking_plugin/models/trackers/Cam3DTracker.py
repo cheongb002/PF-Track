@@ -247,7 +247,7 @@ class Cam3DTracker(PETR):
             track_instances.bboxes = track_instances.cache_bboxes.clone()
             track_instances.logits = track_instances.cache_logits.clone()
             track_instances.scores = track_instances.cache_scores.clone()
-            active_mask = (track_instances.cache_scores >= 0.0)
+            active_mask = (track_instances.cache_scores >= self.runtime_tracker.record_threshold)
 
         track_instances.query_feats[active_mask] = track_instances.cache_query_feats[active_mask]
         track_instances.query_embeds[active_mask] = track_instances.cache_query_embeds[active_mask]
