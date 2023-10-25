@@ -229,7 +229,8 @@ class Fusion3DTracker(Cam3DTracker):
             # 4. Prepare for next frame if not on the last frame
             if frame_idx < num_frame - 1:
                 track_instances = self.frame_summarization(track_instances, tracking=False)
-                active_mask = self.runtime_tracker.get_active_mask(track_instances, training=True)
+                # active_mask = self.runtime_tracker.get_active_mask(track_instances, training=True)
+                active_mask = (track_instances.scores > self.runtime_tracker.threshold)
                 track_instances.track_query_mask[active_mask] = True
                 active_track_instances = track_instances[active_mask]
                 if self.motion_prediction:
