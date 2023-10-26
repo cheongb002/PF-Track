@@ -62,7 +62,7 @@ param_scheduler = [
     # learning rate scheduler, follow onecycle for both the LR and the momentum
     # During the first 8 epochs, learning rate increases from lr to lr_max
     # during the next 12 epochs, learning rate decreases from lr_max to
-    # lr * 0.04
+    # lr * 1e-4
     dict(
         type='CosineAnnealingLR',
         T_max=int(0.4*num_epochs),
@@ -74,7 +74,7 @@ param_scheduler = [
     dict(
         type='CosineAnnealingLR',
         T_max=num_epochs-int(0.4*num_epochs),
-        eta_min=lr * 0.04,
+        eta_min=lr * 1e-4,
         begin=int(0.4*num_epochs),
         end=num_epochs,
         by_epoch=True,
