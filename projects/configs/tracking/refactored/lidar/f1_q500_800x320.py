@@ -57,7 +57,7 @@ optim_wrapper = dict(
 #     power=0.9,
 #     by_epoch=False,
 # )
-
+pct_start = 0.4
 param_scheduler = [
     # learning rate scheduler, follow onecycle for both the LR and the momentum
     # During the first 8 epochs, learning rate increases from lr to lr_max
@@ -65,17 +65,17 @@ param_scheduler = [
     # lr * 1e-4
     dict(
         type='CosineAnnealingLR',
-        T_max=int(0.4*num_epochs),
+        T_max=int(pct_start*num_epochs),
         eta_min=lr_max,
         begin=0,
-        end=int(0.4*num_epochs),
+        end=int(pct_start*num_epochs),
         by_epoch=True,
         convert_to_iter_based=True),
     dict(
         type='CosineAnnealingLR',
-        T_max=num_epochs-int(0.4*num_epochs),
+        T_max=num_epochs-int(pct_start*num_epochs),
         eta_min=lr * 1e-4,
-        begin=int(0.4*num_epochs),
+        begin=int(pct_start*num_epochs),
         end=num_epochs,
         by_epoch=True,
         convert_to_iter_based=True),
@@ -84,17 +84,17 @@ param_scheduler = [
     # during the next 12 epochs, momentum increases from 0.85 to 0.95
     dict(
         type='CosineAnnealingMomentum',
-        T_max=int(0.4*num_epochs),
+        T_max=int(pct_start*num_epochs),
         eta_min=0.85,
         begin=0,
-        end=int(0.4*num_epochs),
+        end=int(pct_start*num_epochs),
         by_epoch=True,
         convert_to_iter_based=True),
     dict(
         type='CosineAnnealingMomentum',
-        T_max=num_epochs-int(0.4*num_epochs),
+        T_max=num_epochs-int(pct_start*num_epochs),
         eta_min=0.95,
-        begin=int(0.4*num_epochs),
+        begin=int(pct_start*num_epochs),
         end=num_epochs,
         by_epoch=True,
         convert_to_iter_based=True)
