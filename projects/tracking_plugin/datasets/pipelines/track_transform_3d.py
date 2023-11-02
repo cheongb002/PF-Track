@@ -88,6 +88,7 @@ class TrackInstanceRangeFilter(ObjectRangeFilter):
 
         return input_dict
 
+
 @TRANSFORMS.register_module()
 class SeqTrackInstanceRangeFilter(TrackInstanceRangeFilter):
     # TODO switch to using TransformWrapper
@@ -96,9 +97,10 @@ class SeqTrackInstanceRangeFilter(TrackInstanceRangeFilter):
         for single_result in data_queue:
             transformed_queue.append(self.transform_single_result(single_result))
         return transformed_queue
-    
+
     def transform_single_result(self, input_dict: dict) -> dict:
         return super().transform(input_dict)
+
 
 @TRANSFORMS.register_module()
 class TrackObjectNameFilter(ObjectNameFilter):
@@ -297,7 +299,7 @@ class SeqBEVFusionGlobalRotScaleTrans(BEVFusionGlobalRotScaleTrans):
         self._rot_bbox_points(input_dict, noise_rotation)
 
         if "pcd_scale_factor" not in input_dict:
-            input_dict['pcd_scale_factor'] = scale_factor
+            input_dict["pcd_scale_factor"] = scale_factor
         self._trans_bbox_points(input_dict, trans_factor)
         self._scale_bbox_points(input_dict)
 
@@ -308,6 +310,10 @@ class SeqBEVFusionGlobalRotScaleTrans(BEVFusionGlobalRotScaleTrans):
             input_dict["pcd_rotation"].T * input_dict["pcd_scale_factor"]
         )
         lidar_augs[:3, 3] = input_dict["pcd_trans"] * input_dict["pcd_scale_factor"]
+
+        if "gt_forecasting_locs" in input_dict.keys():
+            input_dict["gt_forecasting_locs"] = \
+                input_dict["gt_forecasting_locs"] @ lidar_augs[:3, :3].T
 
         if "lidar_aug_matrix" not in input_dict:
             input_dict["lidar_aug_matrix"] = np.eye(4)
@@ -340,7 +346,7 @@ class SeqBEVFusionGlobalRotScaleTrans(BEVFusionGlobalRotScaleTrans):
         input_dict["pcd_rotation"] = rot_mat_T
         input_dict["pcd_rotation_angle"] = noise_rotation
 
-    def _trans_bbox_points(self, input_dict: dict, trans_factor:float) -> None:
+    def _trans_bbox_points(self, input_dict: dict, trans_factor: float) -> None:
         """Private function to translate bounding boxes and points.
 
         Args:
@@ -351,10 +357,10 @@ class SeqBEVFusionGlobalRotScaleTrans(BEVFusionGlobalRotScaleTrans):
             dict: Results after translation, 'points', 'pcd_trans'
             and `gt_bboxes_3d` is updated in the result dict.
         """
-        input_dict['points'].translate(trans_factor)
-        input_dict['pcd_trans'] = trans_factor
-        if 'gt_bboxes_3d' in input_dict:
-            input_dict['gt_bboxes_3d'].translate(trans_factor)
+        input_dict["points"].translate(trans_factor)
+        input_dict["pcd_trans"] = trans_factor
+        if "gt_bboxes_3d" in input_dict:
+            input_dict["gt_bboxes_3d"].translate(trans_factor)
 
 @TRANSFORMS.register_module()
 class SeqBEVFusionRandomFlip3D(BEVFusionRandomFlip3D):
@@ -386,6 +392,8 @@ class SeqBEVFusionRandomFlip3D(BEVFusionRandomFlip3D):
                 data["gt_bboxes_3d"].flip("horizontal")
             if "gt_masks_bev" in data:
                 data["gt_masks_bev"] = data["gt_masks_bev"][:, :, ::-1].copy()
+            if "gt_forecasting_locs" in data:  # [num objs, num forecasting locs, 3]
+                data["gt_forecasting_locs"][..., 1] *= -1
 
         if flip_vertical:
             rotation = np.array([[-1, 0, 0], [0, 1, 0], [0, 0, 1]]) @ rotation
@@ -395,11 +403,14 @@ class SeqBEVFusionRandomFlip3D(BEVFusionRandomFlip3D):
                 data["gt_bboxes_3d"].flip("vertical")
             if "gt_masks_bev" in data:
                 data["gt_masks_bev"] = data["gt_masks_bev"][:, ::-1, :].copy()
+            if "gt_forecasting_locs" in data:
+                data["gt_forecasting_locs"][..., 0] *= -1
 
         if "lidar_aug_matrix" not in data:
             data["lidar_aug_matrix"] = np.eye(4)
         data["lidar_aug_matrix"][:3, :] = rotation @ data["lidar_aug_matrix"][:3, :]
         return data
+
 
 @TRANSFORMS.register_module()
 class SeqPointsRangeFilter(PointsRangeFilter):
@@ -409,6 +420,6 @@ class SeqPointsRangeFilter(PointsRangeFilter):
         for single_result in data_queue:
             transformed_queue.append(self.transform_single_result(single_result))
         return transformed_queue
-    
+
     def transform_single_result(self, input_dict: dict) -> dict:
         return super().transform(input_dict)
