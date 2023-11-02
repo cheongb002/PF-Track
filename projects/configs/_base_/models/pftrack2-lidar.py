@@ -1,6 +1,6 @@
 voxel_size = [0.075, 0.075, 0.2]
 
-
+num_classes = 7 # 10 for detection, 7 for tracking
 model = dict(
     type='Fusion3DTracker',
     data_preprocessor=dict(
@@ -29,7 +29,7 @@ model = dict(
     motion_prediction=False,
     motion_prediction_ref_update=False,
     num_query=500,
-    num_classes=10,
+    num_classes=num_classes, # 10 for detection, 7 for tracking
     # pc_range=point_cloud_range,
     runtime_tracker=dict(
         output_threshold=0.0,
@@ -41,6 +41,7 @@ model = dict(
         future_reasoning=False,
         hist_len=3,
         fut_len=4,
+        num_classes=num_classes,
         # pc_range=point_cloud_range,
         hist_temporal_transformer=dict(
             type='TemporalTransformer',
@@ -149,7 +150,7 @@ model = dict(
         use_conv_for_no_stride=True),
     pts_bbox_head=dict(
         type='BEVFusionTrackingHead',
-        num_classes=10,
+        num_classes=num_classes,
         in_channels=256,
         LID=True,
         with_position=True,
@@ -190,7 +191,7 @@ model = dict(
             max_num=300,
             voxel_size=voxel_size,
             score_threshold=0.0,
-            num_classes=10), 
+            num_classes=num_classes), 
         positional_encoding=dict(
             # type='mmdet.LearnedPositionalEncoding', num_feats=128, normalize=True),
             type='mmdet.SinePositionalEncoding', num_feats=128, normalize=True),
@@ -205,7 +206,7 @@ model = dict(
     ),
     loss=dict(
         type='TrackingLossCombo',
-        num_classes=10,
+        num_classes=num_classes,
         interm_loss=True,
         code_weights=[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.2, 0.2],
         loss_cls=dict(

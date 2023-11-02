@@ -43,6 +43,11 @@ class Fusion3DTracker(Cam3DTracker):
             batch. If out of memory errors, set to False.
         """
         super().__init__(*args, **kwargs)
+        if self.num_classes == 10:
+            self.nontracking_classes = True
+        else:
+            assert self.num_classes == 7, "Only support 7 classes for tracking"
+            self.nontracking_classes = False
         self.batch_clip = batch_clip
         self.pts_voxel_layer = Voxelization(**voxelize_cfg)
         self.voxelize_reduce = voxelize_reduce
@@ -562,8 +567,9 @@ class Fusion3DTracker(Cam3DTracker):
             local_max[:, self.NUS_PEDESTRIAN_IDX, ] = F.max_pool2d(
                 heatmap[:, self.NUS_PEDESTRIAN_IDX], kernel_size=1, stride=1, padding=0)
             # set kernel for traffic_cone to 1
-            local_max[:, self.NUS_TRAFFIC_CONE_IDX, ] = F.max_pool2d(
-                heatmap[:, self.NUS_TRAFFIC_CONE_IDX], kernel_size=1, stride=1, padding=0)
+            if self.nontracking_classes:
+                local_max[:, self.NUS_TRAFFIC_CONE_IDX, ] = F.max_pool2d(
+                    heatmap[:, self.NUS_TRAFFIC_CONE_IDX], kernel_size=1, stride=1, padding=0)
         elif self.test_cfg[
                 'dataset'] == 'Waymo':  # for Pedestrian & Cyclist in Waymo
             raise NotImplementedError
