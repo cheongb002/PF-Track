@@ -22,10 +22,30 @@ train_pipeline = [
          with_bbox_3d=True, 
          with_label_3d=True, 
          with_forecasting=True),
-    dict(type='mmdet3d.PointsRangeFilter', point_cloud_range={{_base_.point_cloud_range}}),
-    dict(type='mmdet3d.TrackInstanceRangeFilter', point_cloud_range={{_base_.point_cloud_range}}),
     dict(type='mmdet3d.TrackObjectNameFilter', classes={{_base_.class_names}}),
     dict(type='mmdet3d.PointShuffle'),
+]
+
+train_pipeline_multiframe = [
+    # dict(
+    #     type='mmdet3d.SeqBEVFusionGlobalRotScaleTrans',
+    #     scale_ratio_range=[0.9, 1.1],
+    #     rot_range=[-0.78539816, 0.78539816],
+    #     translation_std=0.5),
+    # dict(type='mmdet3d.SeqBEVFusionRandomFlip3D'),
+    dict(type='mmdet3d.SeqPointsRangeFilter', point_cloud_range={{_base_.point_cloud_range}}),
+    dict(type='mmdet3d.SeqTrackInstanceRangeFilter', point_cloud_range={{_base_.point_cloud_range}}),
+    dict(type='mmdet3d.Pack3DTrackInputs', 
+         keys=[
+            'points', 'gt_bboxes_3d', 'gt_labels_3d', 'instance_inds', 
+            'gt_forecasting_locs', 'gt_forecasting_masks', 'gt_forecasting_types'],
+        meta_keys=[
+            'cam2img', 'ori_cam2img', 'lidar2cam', 'lidar2img', 'cam2lidar',
+            'ori_lidar2img', 'img_aug_matrix', 'box_type_3d', 'sample_idx',
+            'lidar_path', 'lidar2global', 'img_path', 'transformation_3d_flow', 'pcd_rotation',
+            'pcd_scale_factor', 'pcd_trans', 'img_aug_matrix',
+            'lidar_aug_matrix', 'num_pts_feats', 'timestamp', 'pad_shape'
+        ])
 ]
 
 # turn off cbgs to speed up training
@@ -40,7 +60,7 @@ train_dataloader = dict(
         data_root={{_base_.data_root}},
         ann_file={{_base_.train_pkl_path}},
         pipeline=train_pipeline,
-        pipeline_multiframe={{_base_.train_pipeline_multiframe}},
+        pipeline_multiframe=train_pipeline_multiframe,
         metainfo={{_base_.metainfo}},
         modality={{_base_.input_modality}},
         test_mode=False,

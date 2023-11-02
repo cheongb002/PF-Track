@@ -1,9 +1,11 @@
 # modify from https://github.com/mit-han-lab/bevfusion
+from random import Random
 from typing import Any, Dict
 
 import numpy as np
 import torch
 from mmcv.transforms import BaseTransform
+from mmdet3d.datasets.transforms import RandomFlip3D
 from PIL import Image
 
 from mmdet3d.datasets import GlobalRotScaleTrans
@@ -109,11 +111,11 @@ class ImageAug3D(BaseTransform):
 
 
 @TRANSFORMS.register_module()
-class BEVFusionRandomFlip3D:
+class BEVFusionRandomFlip3D(RandomFlip3D):
     """Compared with `RandomFlip3D`, this class directly records the lidar
     augmentation matrix in the `data`."""
 
-    def __call__(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def transform(self, data: Dict[str, Any]) -> Dict[str, Any]:
         flip_horizontal = np.random.choice([0, 1])
         flip_vertical = np.random.choice([0, 1])
 
