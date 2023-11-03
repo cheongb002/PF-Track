@@ -8,7 +8,7 @@ point_cloud_range = [-54.0, -54.0, -5.0, 54.0, 54.0, 3.0]
 class_names = [
     'car', 'truck', 'bus', 'trailer', 
     'motorcycle', 'bicycle', 'pedestrian', 
-    'construction_vehicle', 'traffic_cone', 'barrier' # non-detection classes must go at the end
+    # 'construction_vehicle', 'traffic_cone', 'barrier' # non-detection classes must go at the end
 ]
 
 dataset_type = 'NuScenesTrackingDataset'
