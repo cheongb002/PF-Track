@@ -362,18 +362,18 @@ class TrackingLossBase(nn.Module):
         loss_dict = dict()
 
         # loss from the last decoder layer
-        loss_dict[f'f{frame_idx}.loss_cls'] = losses_cls[-1]
-        loss_dict[f'f{frame_idx}.loss_bbox'] = losses_bbox[-1]
-        loss_dict[f'f{frame_idx}.matched_iou'] = matched_ious[-1]
+        loss_dict[f'f{frame_idx}/loss_cls'] = losses_cls[-1]
+        loss_dict[f'f{frame_idx}/loss_bbox'] = losses_bbox[-1]
+        loss_dict[f'f{frame_idx}/matched_iou'] = matched_ious[-1]
 
         # loss from other decoder layers
         num_dec_layer = 0
         for loss_cls_i, loss_bbox_i, matched_iou_i in zip(losses_cls[:-1], 
                                                           losses_bbox[:-1],
                                                           matched_ious[:-1]):
-            loss_dict[f'f{frame_idx}.d{num_dec_layer}.loss_cls'] = loss_cls_i
-            loss_dict[f'f{frame_idx}.d{num_dec_layer}.loss_bbox'] = loss_bbox_i
-            loss_dict[f'f{frame_idx}.d{num_dec_layer}.matched_iou'] = matched_iou_i
+            loss_dict[f'f{frame_idx}/d{num_dec_layer}.loss_cls'] = loss_cls_i
+            loss_dict[f'f{frame_idx}/d{num_dec_layer}.loss_bbox'] = loss_bbox_i
+            loss_dict[f'f{frame_idx}/d{num_dec_layer}.matched_iou'] = matched_iou_i
             num_dec_layer += 1
 
         return loss_dict

@@ -45,7 +45,7 @@ class TrackingLossCombo(TrackingLoss):
         loss_prediction = self.loss_traj(
             gt_trajs[..., :2] * gt_masks.unsqueeze(-1), 
             pred_trajs[..., :2] * gt_masks.unsqueeze(-1))
-        loss_dict[f'f{frame_idx}.loss_{loss_key}'] = loss_prediction
+        loss_dict[f'f{frame_idx}/loss_{loss_key}'] = loss_prediction
         return loss_dict
     
     def loss_mem_bank(self,
@@ -87,7 +87,7 @@ class TrackingLossCombo(TrackingLoss):
             cls_scores, labels_list, label_weights_list, avg_factor=cls_avg_factor)
         loss_cls = torch.nan_to_num(loss_cls)
 
-        loss_dict[f'f{frame_idx}.loss_mem_cls'] = loss_cls
+        loss_dict[f'f{frame_idx}/loss_mem_cls'] = loss_cls
 
         # location refinement loss
         gt_bboxes_list = [torch.cat(
@@ -113,7 +113,7 @@ class TrackingLossCombo(TrackingLoss):
 
         loss_bbox = self.loss_bbox(
                 track_instances.cache_bboxes[isnotnan, :10], normalized_bbox_targets[isnotnan, :10], bbox_weights[isnotnan, :10], avg_factor=pos_bbox_num)
-        loss_dict[f'f{frame_idx}.loss_mem_bbox'] = loss_bbox
+        loss_dict[f'f{frame_idx}/loss_mem_bbox'] = loss_bbox
         return loss_dict
 
     def forward(self,

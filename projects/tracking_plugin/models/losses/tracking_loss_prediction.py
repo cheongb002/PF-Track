@@ -51,7 +51,7 @@ class TrackingLossPrediction(TrackingLoss):
         loss_prediction = self.loss_traj(
             gt_trajs[..., :2] * gt_masks.unsqueeze(-1), 
             pred_trajs[..., :2] * gt_masks.unsqueeze(-1))
-        loss_dict[f'f{frame_idx}.loss_{loss_key}'] = loss_prediction
+        loss_dict[f'f{frame_idx}/loss_{loss_key}'] = loss_prediction
         return loss_dict
 
     def forward(self,

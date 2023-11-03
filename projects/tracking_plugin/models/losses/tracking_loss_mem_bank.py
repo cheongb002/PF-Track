@@ -77,7 +77,7 @@ class TrackingLossMemBank(TrackingLoss):
             cls_scores, labels_list, label_weights_list, avg_factor=cls_avg_factor)
         loss_cls = torch.nan_to_num(loss_cls)
 
-        loss_dict[f'f{frame_idx}.loss_mem_cls'] = loss_cls
+        loss_dict[f'f{frame_idx}/loss_mem_cls'] = loss_cls
 
         # location refinement loss
         gt_bboxes_list = [torch.cat(
@@ -103,7 +103,7 @@ class TrackingLossMemBank(TrackingLoss):
 
         loss_bbox = self.loss_bbox(
                 track_instances.bbox_preds[isnotnan, :10], normalized_bbox_targets[isnotnan, :10], bbox_weights[isnotnan, :10], avg_factor=pos_bbox_num)
-        loss_dict[f'f{frame_idx}.loss_mem_bbox'] = loss_bbox
+        loss_dict[f'f{frame_idx}/loss_mem_bbox'] = loss_bbox
         return loss_dict
 
     def forward(self,
