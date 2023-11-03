@@ -191,7 +191,6 @@ def create_groundtruth_database(dataset_class_name,
                     with_bbox_3d=True,
                     with_label_3d=True)
             ])
-
     elif dataset_class_name == 'WaymoDataset':
         backend_args = None
         dataset_cfg.update(
@@ -294,7 +293,7 @@ def create_groundtruth_database(dataset_class_name,
 
             # save point clouds and image patches for each object
             gt_points = points[point_indices[:, i]]
-            gt_points[:, :3] -= gt_boxes_3d[i, :3]
+            gt_points[:, :3] -= gt_boxes_3d[i, :3] # center the points about the object
 
             if with_mask:
                 if object_masks[i].sum() == 0 or not valid_inds[i]:

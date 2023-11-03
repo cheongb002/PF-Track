@@ -10,6 +10,8 @@ from tools.dataset_converters import (nuscenes_tracking_converter,
                                       semantickitti_converter)
 from tools.dataset_converters.create_gt_database import (
     GTDatabaseCreater, create_groundtruth_database)
+from tools.dataset_converters.create_gt_track_database import \
+    create_groundtruth_track_database
 from tools.dataset_converters.update_infos_to_v2 import update_pkl_infos
 
 
@@ -119,13 +121,13 @@ def nuscenes_tracking_data_prep(root_path,
         update_pkl_infos('nuscenes-tracking', out_dir=out_dir, pkl_path=info_test_path)
         return
     # update to v2 infos
-    info_train_path = osp.join(out_dir, f'{info_prefix}_infos_train.pkl')
-    info_val_path = osp.join(out_dir, f'{info_prefix}_infos_val.pkl')
+    info_train_path = osp.join(out_dir, f'{info_prefix}_track_infos_train.pkl')
+    info_val_path = osp.join(out_dir, f'{info_prefix}_track_infos_val.pkl')
     update_pkl_infos('nuscenes-tracking', out_dir=out_dir, pkl_path=info_train_path)
     update_pkl_infos('nuscenes-tracking', out_dir=out_dir, pkl_path=info_val_path)
     # create groundtruth database
-    # create_groundtruth_database(dataset_name, root_path, info_prefix,
-    #                             f'{info_prefix}_infos_train.pkl')
+    create_groundtruth_track_database(dataset_name, out_dir, info_prefix,
+                                f'{info_prefix}_track_infos_train.pkl')
 
 
 def lyft_data_prep(root_path, info_prefix, version, max_sweeps=10):
@@ -316,11 +318,6 @@ parser.add_argument(
     '--only-gt-database',
     action='store_true',
     help='Whether to only generate ground truth database.')
-parser.add_argument(
-    '--forecasting',
-    action='store_true',
-    default=False,
-    help='prepare trajectory forecasting data')
 args = parser.parse_args()
 
 if __name__ == '__main__':
@@ -366,34 +363,6 @@ if __name__ == '__main__':
                 dataset_name='NuScenesDataset',
                 out_dir=args.out_dir,
                 max_sweeps=args.max_sweeps)
-    elif args.dataset == 'nuscenes-tracking' and args.version != 'v1.0-mini':
-        train_version = f'{args.version}-trainval'
-        nuscenes_tracking_data_prep(
-            root_path=args.root_path,
-            info_prefix=args.extra_tag,
-            version=train_version,
-            dataset_name='NuScenesTrackingDataset',
-            out_dir=args.out_dir,
-            max_sweeps=args.max_sweeps,
-            forecasting=args.forecasting)
-        test_version = f'{args.version}-test'
-        nuscenes_tracking_data_prep(
-            root_path=args.root_path,
-            info_prefix=args.extra_tag,
-            version=test_version,
-            dataset_name='NuScenesTrackingDataset',
-            out_dir=args.out_dir,
-            max_sweeps=args.max_sweeps,
-            forecasting=False)
-    elif args.dataset == 'nuscenes-tracking' and args.version == 'v1.0-mini':
-        nuscenes_tracking_data_prep(
-           root_path=args.root_path,
-           info_prefix=args.extra_tag,
-           version=args.version,
-           dataset_name='NuScenesTrackingDataset',
-           out_dir=args.out_dir,
-           max_sweeps=args.max_sweeps,
-           forecasting=args.forecasting)
     elif args.dataset == 'nuscenes' and args.version == 'v1.0-mini':
         if args.only_gt_database:
             create_groundtruth_database('NuScenesDataset', args.root_path,
@@ -408,6 +377,44 @@ if __name__ == '__main__':
                 dataset_name='NuScenesDataset',
                 out_dir=args.out_dir,
                 max_sweeps=args.max_sweeps)
+    elif args.dataset == 'nuscenes-tracking' and args.version != 'v1.0-mini':
+        if args.only_gt_database:
+            create_groundtruth_track_database(
+                'NuScenesTrackingDataset', args.root_path,
+                args.extra_tag, f'{args.extra_tag}_track_infos_train.pkl')
+        else:
+            train_version = f'{args.version}-trainval'
+            nuscenes_tracking_data_prep(
+                root_path=args.root_path,
+                info_prefix=args.extra_tag,
+                version=train_version,
+                dataset_name='NuScenesTrackingDataset',
+                out_dir=args.out_dir,
+                max_sweeps=args.max_sweeps,
+                forecasting=True)
+            test_version = f'{args.version}-test'
+            nuscenes_tracking_data_prep(
+                root_path=args.root_path,
+                info_prefix=args.extra_tag,
+                version=test_version,
+                dataset_name='NuScenesTrackingDataset',
+                out_dir=args.out_dir,
+                max_sweeps=args.max_sweeps,
+                forecasting=False)
+    elif args.dataset == 'nuscenes-tracking' and args.version == 'v1.0-mini':
+        if args.only_gt_database:
+            create_groundtruth_track_database(
+                'NuScenesTrackingDataset', args.root_path,
+                args.extra_tag, f'{args.extra_tag}_track_infos_train.pkl')
+        else:
+            nuscenes_tracking_data_prep(
+                root_path=args.root_path,
+                info_prefix=args.extra_tag,
+                version=args.version,
+                dataset_name='NuScenesTrackingDataset',
+                out_dir=args.out_dir,
+                max_sweeps=args.max_sweeps,
+                forecasting=True)
     elif args.dataset == 'lyft':
         train_version = f'{args.version}-train'
         lyft_data_prep(

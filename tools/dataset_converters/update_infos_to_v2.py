@@ -508,15 +508,16 @@ def update_nuscenes_tracking_infos(pkl_path, out_dir):
                 # tracking params
                 empty_instance['instance_inds'] = ori_info_dict[
                     'instance_inds'][i]
-                empty_instance['forecasting_locs'] = ori_info_dict[
-                    'forecasting_locs'][i]
-                empty_instance['forecasting_tokens'] = ori_info_dict[
-                    'forecasting_tokens'][i]
-                empty_instance['forecasting_masks'] = ori_info_dict[
-                    'forecasting_masks'][i]
-                empty_instance['forecasting_types'] = ori_info_dict[
-                    'forecasting_types'][i]
-                
+                if "forecasting_locs" in ori_info_dict:
+                    empty_instance['forecasting_locs'] = ori_info_dict[
+                        'forecasting_locs'][i]
+                    empty_instance['forecasting_tokens'] = ori_info_dict[
+                        'forecasting_tokens'][i]
+                    empty_instance['forecasting_masks'] = ori_info_dict[
+                        'forecasting_masks'][i]
+                    empty_instance['forecasting_types'] = ori_info_dict[
+                        'forecasting_types'][i]
+
                 empty_instance = clear_instance_unused_keys(empty_instance)
                 temp_data_info['instances'].append(empty_instance)
             temp_data_info[

@@ -70,7 +70,6 @@ def create_nuscenes_infos(root_path,
     elif version == 'v1.0-mini':
         train_scenes = splits.mini_train
         val_scenes = splits.mini_val
-        info_prefix = info_prefix + '-mini'
     else:
         raise ValueError('unknown')
 
@@ -104,18 +103,18 @@ def create_nuscenes_infos(root_path,
         print('test sample: {}'.format(len(train_nusc_infos)))
         data = dict(infos=train_nusc_infos, metadata=metadata)
         info_path = osp.join(out_dir,
-                             '{}_infos_test.pkl'.format(info_prefix))
+                             '{}_track_infos_test.pkl'.format(info_prefix))
         mmengine.dump(data, info_path)
     else:
         print('train sample: {}, val sample: {}'.format(
             len(train_nusc_infos), len(val_nusc_infos)))
         data = dict(infos=train_nusc_infos, metadata=metadata)
         info_path = osp.join(out_dir,
-                             '{}_infos_train.pkl'.format(info_prefix))
+                             '{}_track_infos_train.pkl'.format(info_prefix))
         mmengine.dump(data, info_path)
         data['infos'] = val_nusc_infos
         info_val_path = osp.join(out_dir,
-                                 '{}_infos_val.pkl'.format(info_prefix))
+                                 '{}_track_infos_val.pkl'.format(info_prefix))
         mmengine.dump(data, info_val_path)
 
 
