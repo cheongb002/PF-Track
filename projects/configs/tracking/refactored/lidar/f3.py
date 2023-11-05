@@ -1,28 +1,32 @@
 _base_ = [
-    './f1_q500_800x320.py',
+    "./f1_q500_800x320.py",
 ]
 
 train_pipeline = [
     dict(
-        type='mmdet3d.LoadPointsFromFile',
-        coord_type='LIDAR',
+        type="mmdet3d.LoadPointsFromFile",
+        coord_type="LIDAR",
         load_dim=5,
         use_dim=5,
-        backend_args={{_base_.backend_args}}),
+        backend_args={{_base_.backend_args}},
+    ),
     dict(
-        type='mmdet3d.LoadPointsFromMultiSweeps',
+        type="mmdet3d.LoadPointsFromMultiSweeps",
         sweeps_num=9,
         load_dim=5,
         use_dim=5,
         pad_empty_sweeps=True,
         remove_close=True,
-        backend_args={{_base_.backend_args}}),
-    dict(type='mmdet3d.TrackLoadAnnotations3D', 
-         with_bbox_3d=True, 
-         with_label_3d=True, 
-         with_forecasting=True),
-    dict(type='mmdet3d.TrackObjectNameFilter', classes={{_base_.class_names}}),
-    dict(type='mmdet3d.PointShuffle'),
+        backend_args={{_base_.backend_args}},
+    ),
+    dict(
+        type="mmdet3d.TrackLoadAnnotations3D",
+        with_bbox_3d=True,
+        with_label_3d=True,
+        with_forecasting=True,
+    ),
+    dict(type="mmdet3d.TrackObjectNameFilter", classes={{_base_.class_names}}),
+    dict(type="mmdet3d.PointShuffle"),
 ]
 
 train_pipeline_multiframe = [
@@ -33,19 +37,49 @@ train_pipeline_multiframe = [
         rot_range=[-0.78539816, 0.78539816],
         translation_std=0.5),
     dict(type='mmdet3d.SeqBEVFusionRandomFlip3D'),
-    dict(type='mmdet3d.SeqPointsRangeFilter', point_cloud_range={{_base_.point_cloud_range}}),
-    dict(type='mmdet3d.SeqTrackInstanceRangeFilter', point_cloud_range={{_base_.point_cloud_range}}),
-    dict(type='mmdet3d.Pack3DTrackInputs', 
-         keys=[
-            'points', 'gt_bboxes_3d', 'gt_labels_3d', 'instance_inds', 
-            'gt_forecasting_locs', 'gt_forecasting_masks', 'gt_forecasting_types'],
+    dict(
+        type="mmdet3d.SeqPointsRangeFilter",
+        point_cloud_range={{_base_.point_cloud_range}},
+    ),
+    dict(
+        type="mmdet3d.SeqTrackInstanceRangeFilter",
+        point_cloud_range={{_base_.point_cloud_range}},
+    ),
+    dict(
+        type="mmdet3d.Pack3DTrackInputs",
+        keys=[
+            "points",
+            "gt_bboxes_3d",
+            "gt_labels_3d",
+            "instance_inds",
+            "gt_forecasting_locs",
+            "gt_forecasting_masks",
+            "gt_forecasting_types",
+        ],
         meta_keys=[
-            'cam2img', 'ori_cam2img', 'lidar2cam', 'lidar2img', 'cam2lidar',
-            'ori_lidar2img', 'img_aug_matrix', 'box_type_3d', 'sample_idx',
-            'lidar_path', 'lidar2global', 'img_path', 'transformation_3d_flow', 'pcd_rotation',
-            'pcd_scale_factor', 'pcd_trans', 'img_aug_matrix',
-            'lidar_aug_matrix', 'num_pts_feats', 'timestamp', 'pad_shape'
-        ])
+            "cam2img",
+            "ori_cam2img",
+            "lidar2cam",
+            "lidar2img",
+            "cam2lidar",
+            "ori_lidar2img",
+            "img_aug_matrix",
+            "box_type_3d",
+            "sample_idx",
+            "lidar_path",
+            "lidar2global",
+            "img_path",
+            "transformation_3d_flow",
+            "pcd_rotation",
+            "pcd_scale_factor",
+            "pcd_trans",
+            "img_aug_matrix",
+            "lidar_aug_matrix",
+            "num_pts_feats",
+            "timestamp",
+            "pad_shape",
+        ],
+    ),
 ]
 
 # turn off cbgs to speed up training
@@ -68,9 +102,9 @@ train_dataloader = dict(
         # we use box_type_3d='LiDAR' in kitti and nuscenes dataset
         # and box_type_3d='Depth' in sunrgbd and scannet dataset.
         use_valid_flag=True,
-        box_type_3d='LiDAR',
+        box_type_3d="LiDAR",
         filter_empty_gt=True,
-        backend_args={{_base_.backend_args}}
+        backend_args={{_base_.backend_args}},
     )
 )
 
@@ -83,6 +117,14 @@ train_dataloader = dict(
 #         )
 #     )
 # )
+
+# when evaluating NuScenesTrackingMetric, we need to use a special dataloader sampler
+val_dataloader = dict(
+    sampler=dict(type="TrackSampler3D"),
+)
+test_dataloader = dict(
+    sampler=dict(type="TrackSampler3D"),
+)
 
 model = dict(
     tracking=True,
@@ -108,7 +150,11 @@ model = dict(
     ),
 )
 
-val_evaluator = dict(type='NuScenesTrackingMetric', jsonfile_prefix='work_dirs/nuscenes_results/tracking')
-test_evaluator = dict(type='NuScenesTrackingMetric', jsonfile_prefix='work_dirs/nuscenes_results/tracking')
+val_evaluator = dict(
+    type="NuScenesTrackingMetric", jsonfile_prefix="work_dirs/nuscenes_results/tracking"
+)
+test_evaluator = dict(
+    type="NuScenesTrackingMetric", jsonfile_prefix="work_dirs/nuscenes_results/tracking"
+)
 # load_from = 'ckpts/f1_heatmap/epoch_20.pth'
-load_from = 'work_dirs/tracking/lidar/f1/2023-10-14/epoch_4.pth'
+load_from = "work_dirs/tracking/lidar/f1/2023-10-14/epoch_4.pth"
