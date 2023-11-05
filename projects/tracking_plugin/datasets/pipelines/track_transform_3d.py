@@ -498,6 +498,4 @@ class TrackSample(ObjectSample):
         input_dict["gt_forecasting_masks"] = gt_forecasting_masks
         input_dict["gt_forecasting_types"] = gt_forecasting_types
 
-        print(f"sampled {len(sampled_gt_bboxes_3d)} objects")
-
         return input_dict
