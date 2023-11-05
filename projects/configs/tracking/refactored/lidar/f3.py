@@ -2,7 +2,6 @@ _base_ = [
     './f1_q500_800x320.py',
 ]
 
-# remove flip and rot/scale/trans augmentations
 train_pipeline = [
     dict(
         type='mmdet3d.LoadPointsFromFile',
@@ -27,12 +26,13 @@ train_pipeline = [
 ]
 
 train_pipeline_multiframe = [
-    # dict(
-    #     type='mmdet3d.SeqBEVFusionGlobalRotScaleTrans',
-    #     scale_ratio_range=[0.9, 1.1],
-    #     rot_range=[-0.78539816, 0.78539816],
-    #     translation_std=0.5),
-    # dict(type='mmdet3d.SeqBEVFusionRandomFlip3D'),
+    dict(type='mmdet3d.TrackSample', db_sampler={{_base_.db_sampler}}),
+    dict(
+        type='mmdet3d.SeqBEVFusionGlobalRotScaleTrans',
+        scale_ratio_range=[0.9, 1.1],
+        rot_range=[-0.78539816, 0.78539816],
+        translation_std=0.5),
+    dict(type='mmdet3d.SeqBEVFusionRandomFlip3D'),
     dict(type='mmdet3d.SeqPointsRangeFilter', point_cloud_range={{_base_.point_cloud_range}}),
     dict(type='mmdet3d.SeqTrackInstanceRangeFilter', point_cloud_range={{_base_.point_cloud_range}}),
     dict(type='mmdet3d.Pack3DTrackInputs', 

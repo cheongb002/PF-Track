@@ -76,7 +76,9 @@ def main():
         # locate the information in data_infos
         data_info_idx = data_info_sample_tokens.index(sample_token)
         sample_info = data_infos[data_info_idx]
-        raw_data = dataset[data_info_idx][0]['inputs']
+        data = dataset[data_info_idx][0]
+        raw_data = data['inputs']
+        ann_info = sample_info['eval_ann_info']
         
         # create location for visualization
         scene_token = sample_info['scene_token']
@@ -96,8 +98,9 @@ def main():
                                   np.ones(pc.shape[0])[:, np.newaxis]),
                                   axis=1)
         pc = ((new_pcs @ l2e.T) @ e2g.T)[:, :3]
-        gt_bboxes = sample_info['eval_ann_info']['gt_bboxes_3d']
-        instance_ids = sample_info['eval_ann_info']['instance_inds']
+        gt_bboxes = ann_info['gt_bboxes_3d']
+        instance_ids = ann_info['instance_inds']
+
         visualizer = Visualizer2D(name=str(sample_idx), figsize=(20, 20))
         COLOR_KEYS = list(visualizer.COLOR_MAP.keys())
         visualizer.handler_pc(pc)
@@ -147,16 +150,17 @@ def main():
                 color = visualizer.COLOR_MAP[COLOR_KEYS[track_id % len(COLOR_KEYS)]]
                 color_list.append(color)
 
-        # if len(all_trajs) > 0:
-        #     all_trajs = np.concatenate(all_trajs)
-        #     traj_num, T, dim = all_trajs.shape
-        #     new_trajs = all_trajs
-        #     for i in range(traj_num):
-        #         plt.plot(new_trajs[i, :, 0], new_trajs[i, :, 1], color=color_list[i])
+        if len(all_trajs) > 0:
+            all_trajs = np.concatenate(all_trajs)
+            traj_num, T, dim = all_trajs.shape
+            new_trajs = all_trajs
+            for i in range(traj_num):
+                plt.plot(new_trajs[i, :, 0], new_trajs[i, :, 1], color=color_list[i])
         
         # forecasting gt visualization
-        # if 'forecasting_locs' in sample_info.keys():
-        #     trajs = sample_info['forecasting_locs'][:, :9, :]
+        # if 'forecasting_locs' in ann_info.keys():
+        #     forecasting_locs = ann_info['forecasting_locs']
+        #     trajs = forecasting_locs[:, :9, :]
         #     traj_num, ts, dim = trajs.shape
         #     new_trajs = trajs.reshape((traj_num * ts, dim))
         #     new_trajs = np.concatenate((new_trajs,

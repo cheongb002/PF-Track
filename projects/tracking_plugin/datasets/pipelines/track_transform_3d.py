@@ -13,6 +13,7 @@ from mmdet3d.datasets.transforms.transforms_3d import (
     ObjectNameFilter,
     ObjectRangeFilter,
     PointsRangeFilter,
+    ObjectSample,
 )
 from mmdet3d.registry import TRANSFORMS
 from mmdet3d.structures import (
@@ -312,8 +313,11 @@ class SeqBEVFusionGlobalRotScaleTrans(BEVFusionGlobalRotScaleTrans):
         lidar_augs[:3, 3] = input_dict["pcd_trans"] * input_dict["pcd_scale_factor"]
 
         if "gt_forecasting_locs" in input_dict.keys():
-            input_dict["gt_forecasting_locs"] = \
-                input_dict["gt_forecasting_locs"] @ lidar_augs[:3, :3].T
+            augmented_locs = input_dict["gt_forecasting_locs"].copy()
+            augmented_locs = np.concatenate(
+                [augmented_locs, np.ones((*augmented_locs.shape[:-1], 1))], axis=-1
+            )
+            input_dict["gt_forecasting_locs"] = augmented_locs @ lidar_augs[:3, :].T
 
         if "lidar_aug_matrix" not in input_dict:
             input_dict["lidar_aug_matrix"] = np.eye(4)
@@ -361,6 +365,7 @@ class SeqBEVFusionGlobalRotScaleTrans(BEVFusionGlobalRotScaleTrans):
         input_dict["pcd_trans"] = trans_factor
         if "gt_bboxes_3d" in input_dict:
             input_dict["gt_bboxes_3d"].translate(trans_factor)
+
 
 @TRANSFORMS.register_module()
 class SeqBEVFusionRandomFlip3D(BEVFusionRandomFlip3D):
@@ -423,3 +428,76 @@ class SeqPointsRangeFilter(PointsRangeFilter):
 
     def transform_single_result(self, input_dict: dict) -> dict:
         return super().transform(input_dict)
+
+
+@TRANSFORMS.register_module()
+class TrackSample(ObjectSample):
+    """
+    TODO: support 2D sampling
+    TODO: support ground plane sampling
+    """
+
+    def transform(self, data_queue: list) -> list:
+        if self.disabled:
+            return data_queue
+        # sample tracks from the db
+        sampled_dicts = self.db_sampler.sample_all(data_queue)
+        # inject tracks into each frame of the data queue
+        for i, (input_dict, sampled_dict) in enumerate(zip(data_queue, sampled_dicts)):
+            data_queue[i] = self.transform_single_result(input_dict, sampled_dict)
+        return data_queue
+
+    def transform_single_result(self, input_dict: dict, sampled_dict: dict) -> dict:
+        if sampled_dict is None:
+            return input_dict
+        gt_bboxes_3d = input_dict["gt_bboxes_3d"]
+        gt_labels_3d = input_dict["gt_labels_3d"]
+        gt_instance_inds = input_dict["instance_inds"]
+        gt_forecasting_locs = input_dict["gt_forecasting_locs"]
+        gt_forecasting_masks = input_dict["gt_forecasting_masks"]
+        gt_forecasting_types = input_dict["gt_forecasting_types"]
+        points = input_dict["points"]
+
+        sampled_gt_bboxes_3d = sampled_dict["gt_bboxes_3d"]
+        sampled_gt_labels = sampled_dict["gt_labels_3d"]
+        sampled_gt_instance_inds = sampled_dict["instance_inds"]
+        sampled_gt_forecasting_locs = sampled_dict["gt_forecasting_locs"]
+        sampled_gt_forecasting_masks = sampled_dict["gt_forecasting_masks"]
+        sampled_gt_forecasting_types = sampled_dict["gt_forecasting_types"]
+        sampled_points = sampled_dict["points"]
+
+        # add sampled annotations to the original gt annotations
+        gt_labels_3d = np.concatenate(
+            [gt_labels_3d, sampled_gt_labels], axis=0, dtype=np.int64
+        )
+        gt_bboxes_3d = gt_bboxes_3d.new_box(
+            np.concatenate([gt_bboxes_3d.numpy(), sampled_gt_bboxes_3d])
+        )
+        gt_instance_inds = np.concatenate(
+            [gt_instance_inds, sampled_gt_instance_inds], axis=0
+        )
+        gt_forecasting_locs = np.concatenate(
+            [gt_forecasting_locs, sampled_gt_forecasting_locs], axis=0
+        )
+        gt_forecasting_masks = np.concatenate(
+            [gt_forecasting_masks, sampled_gt_forecasting_masks], axis=0
+        )
+        gt_forecasting_types = np.concatenate(
+            [gt_forecasting_types, sampled_gt_forecasting_types], axis=0
+        )
+
+        # insert the sampled points into the points tensor
+        points = self.remove_points_in_boxes(points, sampled_gt_bboxes_3d)
+        points = points.cat([sampled_points, points])
+
+        input_dict["gt_bboxes_3d"] = gt_bboxes_3d
+        input_dict["gt_labels_3d"] = gt_labels_3d
+        input_dict["points"] = points
+        input_dict["instance_inds"] = gt_instance_inds
+        input_dict["gt_forecasting_locs"] = gt_forecasting_locs
+        input_dict["gt_forecasting_masks"] = gt_forecasting_masks
+        input_dict["gt_forecasting_types"] = gt_forecasting_types
+
+        print(f"sampled {len(sampled_gt_bboxes_3d)} objects")
+
+        return input_dict

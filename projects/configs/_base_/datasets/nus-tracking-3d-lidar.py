@@ -8,7 +8,7 @@ point_cloud_range = [-54.0, -54.0, -5.0, 54.0, 54.0, 3.0]
 class_names = [
     'car', 'truck', 'bus', 'trailer', 
     'motorcycle', 'bicycle', 'pedestrian', 
-    'construction_vehicle', 'traffic_cone', 'barrier' # non-detection classes must go at the end
+    # 'construction_vehicle', 'traffic_cone', 'barrier' # non-detection classes must go at the end
 ]
 
 dataset_type = 'NuScenesTrackingDataset'
@@ -39,9 +39,48 @@ train_pkl_path = 'mmlab-v2/nuscenes_infos_train.pkl'
 test_pkl_path = 'mmlab-v2/nuscenes_infos_val.pkl'
 val_pkl_path = 'mmlab-v2/nuscenes_infos_val.pkl'
 # metainfo = dict(classes=class_names, version='v1.0-mini')
-# train_pkl_path = 'mmlab-v2/tracking_forecasting-mini_infos_val.pkl'
-# test_pkl_path = 'mmlab-v2/tracking_forecasting-mini_infos_val.pkl'
-# val_pkl_path = 'mmlab-v2/tracking_forecasting-mini_infos_val.pkl'
+# train_pkl_path = 'nuscenes_track_infos_val.pkl'
+# test_pkl_path = 'nuscenes_track_infos_val.pkl'
+# val_pkl_path = 'nuscenes_track_infos_val.pkl'
+
+db_sampler = dict(
+    type="TrackDBSampler",
+    data_root=data_root,
+    info_path=data_root + 'nuscenes_dbinfos_train.pkl',
+    rate=1.0,
+    prepare=dict(
+        # filter_by_difficulty=[-1],
+        filter_by_min_points=dict(
+            car=5,
+            truck=5,
+            bus=5,
+            trailer=5,
+            # construction_vehicle=5,
+            # traffic_cone=5,
+            # barrier=5,
+            motorcycle=5,
+            bicycle=5,
+            pedestrian=5
+            )),
+    classes=class_names,
+    sample_groups=dict(
+        car=2,
+        truck=3,
+        # construction_vehicle=7,
+        bus=4,
+        trailer=6,
+        # barrier=2,
+        motorcycle=6,
+        bicycle=6,
+        pedestrian=2,
+        # traffic_cone=2
+        ),
+    points_loader=dict(
+        type='LoadPointsFromFile',
+        coord_type='LIDAR',
+        load_dim=5,
+        use_dim=[0, 1, 2, 3, 4],
+        backend_args=backend_args))
 
 train_pipeline = [
     dict(
@@ -62,19 +101,20 @@ train_pipeline = [
          with_bbox_3d=True, 
          with_label_3d=True, 
          with_forecasting=True),
-    dict(
-        type='mmdet3d.GlobalRotScaleTrans',
-        scale_ratio_range=[0.9, 1.1],
-        rot_range=[-0.78539816, 0.78539816],
-        translation_std=0.5),
-    dict(type='mmdet3d.BEVFusionRandomFlip3D'),
-    dict(type='mmdet3d.PointsRangeFilter', point_cloud_range=point_cloud_range),
-    dict(type='mmdet3d.TrackInstanceRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='mmdet3d.TrackObjectNameFilter', classes=class_names),
     dict(type='mmdet3d.PointShuffle'),
 ]
 
 train_pipeline_multiframe = [
+    dict(type='mmdet3d.TrackSample', db_sampler=db_sampler),
+    dict(
+        type='mmdet3d.SeqBEVFusionGlobalRotScaleTrans',
+        scale_ratio_range=[0.9, 1.1],
+        rot_range=[-0.78539816, 0.78539816],
+        translation_std=0.5),
+    dict(type='mmdet3d.SeqBEVFusionRandomFlip3D'),
+    dict(type='mmdet3d.SeqPointsRangeFilter', point_cloud_range=point_cloud_range),
+    dict(type='mmdet3d.SeqTrackInstanceRangeFilter', point_cloud_range=point_cloud_range),
     dict(type='mmdet3d.Pack3DTrackInputs', 
          keys=[
             'points', 'gt_bboxes_3d', 'gt_labels_3d', 'instance_inds', 
@@ -97,7 +137,7 @@ test_pipeline = [
         backend_args=backend_args),
     dict(
         type='mmdet3d.LoadPointsFromMultiSweeps',
-        sweeps_num=9,
+        sweeps_num=10,
         load_dim=5,
         use_dim=5,
         pad_empty_sweeps=True,

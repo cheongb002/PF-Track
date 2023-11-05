@@ -387,6 +387,7 @@ class Fusion3DTracker(Cam3DTracker):
             instance.scores_3d = results['scores_3d']
             instance.track_scores = results['track_scores']
             instance.track_ids = results['track_ids']
+            instance.forecasting = results['forecasting']
             results_list_3d.append(instance)
         detsamples = self.add_pred_to_datasample(
             data_samples[0], data_instances_3d=results_list_3d
