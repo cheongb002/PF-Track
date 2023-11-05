@@ -120,10 +120,10 @@ train_dataloader = dict(
 
 # when evaluating NuScenesTrackingMetric, we need to use a special dataloader sampler
 val_dataloader = dict(
-    sampler=dict(type="TrackSampler3D"),
+    sampler=dict(type="TrackSampler3D", _delete_=True,),
 )
 test_dataloader = dict(
-    sampler=dict(type="TrackSampler3D"),
+    sampler=dict(type="TrackSampler3D", _delete_=True,),
 )
 
 model = dict(
